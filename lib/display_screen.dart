@@ -462,78 +462,115 @@ void _consumeFrames() {
 
   Widget _led(bool state, Color onColor) {
     return Container(
-      width: 24,
-      height: 24,
-      decoration: BoxDecoration(
-        color: state ? onColor : Colors.white,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.black54),
-      ),
-    );
-  }
-
-  Widget _display() {
-    return Container(
-      width: 340,
-      height: 190,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.blue.shade800,
-        border: Border.all(color: Colors.black, width: 1.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: lines.map((line) {
-          return Text(
-            line,
-            maxLines: 1,
-            overflow: TextOverflow.clip,
-            softWrap: false,
-            style: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 24,
-              height: 1.0,
-              color: Colors.white,
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _button(String text, VoidCallback onPressed) {
-    return SizedBox(
-      width: 78,
-      height: 46,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          padding: EdgeInsets.zero,
-          textStyle: const TextStyle(fontSize: 14),
-        ),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            text,
-            maxLines: 1,
-            softWrap: false,
+    width: 26,
+    height: 26,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      color: state ? onColor : const Color(0xFFE8E8E8),
+      border: Border.all(color: Colors.black87, width: 1.4),
+      boxShadow: [
+        if (state)
+          BoxShadow(
+            color: onColor.withOpacity(0.65),
+            blurRadius: 10,
+            spreadRadius: 2,
           ),
+        const BoxShadow(
+          color: Colors.black26,
+          blurRadius: 2,
+          offset: Offset(1, 2),
+        ),
+      ],
+    ),
+    );
+  }
+
+Widget _display() {
+  return Container(
+    width: 250,
+    height: 162,
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+    decoration: BoxDecoration(
+      color: const Color(0xFF0B4FA3),
+      borderRadius: BorderRadius.circular(4),
+      border: Border.all(color: Colors.black, width: 2),
+      boxShadow: const [
+        BoxShadow(
+          color: Colors.black45,
+          blurRadius: 8,
+          offset: Offset(2, 4),
+        ),
+      ],
+    ),
+    child: Center(
+      child: SizedBox(
+        width: 250,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: lines.map((line) {
+            return Text(
+              line.padRight(16).substring(0, 16),
+              maxLines: 1,
+              overflow: TextOverflow.clip,
+              softWrap: false,
+              style: const TextStyle(
+                fontFamily: 'Courier',
+                fontSize: 22,
+                height: 1.0,
+                color: Colors.white,
+                letterSpacing: 0.8,
+                fontWeight: FontWeight.w600,
+              ),
+            );
+          }).toList(),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
-  Widget _buttonRow(List<Widget> children) {
-    return SizedBox(
-      width: 340,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: children,
+Widget _button(String text, VoidCallback onPressed) {
+  return SizedBox(
+    width: 76,
+    height: 44,
+    child: ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFFE9ECEF),
+        foregroundColor: Colors.black,
+        elevation: 3,
+        padding: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: const BorderSide(color: Colors.black54, width: 1),
+        ),
+        textStyle: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
+        ),
       ),
-    );
-  }
-
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          text,
+          maxLines: 1,
+          softWrap: false,
+        ),
+      ),
+    ),
+  );
+}
+Widget _buttonRow(List<Widget> children) {
+  return SizedBox(
+    width: 342,
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: children,
+    ),
+  );
+}
   Color _statusColor() {
     switch (sessionState) {
       case DisplaySessionState.terminalReady:
@@ -546,64 +583,114 @@ void _consumeFrames() {
         return Colors.grey;
     }
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('FB10 Display'),
-      ),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                SizedBox(
-                  width: 340,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _led(ledLeft, Colors.red),
-                      _led(ledRight, Colors.green),
-                    ],
-                  ),
+  
+    @override
+    Widget build(BuildContext context) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF202124),
+        appBar: AppBar(
+          title: const Text('FB10 Display'),
+          backgroundColor: Colors.blueGrey,
+        ),
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              child: Container(
+                width: 382,
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF5F676D),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: Colors.black87, width: 2),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black54,
+                      blurRadius: 16,
+                      offset: Offset(4, 8),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 18),
-                _display(),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: 340,
-                  child: Row(
-                    children: [
-                      Icon(Icons.circle, size: 12, color: _statusColor()),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          statusText,
-                          style: const TextStyle(fontSize: 13),
-                        ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 180,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            children: [
+                              const Text(
+                                'ERROR',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              _led(ledLeft, Colors.red),
+                            ],
+                          ),
+                          Column(
+                            children: [
+                              const Text(
+                                'OPERATE',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              _led(ledRight, Colors.green),
+                            ],
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 14),
+                    _display(),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: 342,
+                      child: Row(
+                        children: [
+                          Icon(Icons.circle, size: 11, color: _statusColor()),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              statusText,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    _buttonRow([
+                      _button('Menu', _sendMenu),
+                      _button('Monitor', _sendMonitor),
+                      _button('Errors', _sendErrors),
+                    ]),
+                    const SizedBox(height: 10),
+                    _buttonRow([
+                      _button('QUIT', _sendQuit),
+                      _button('AB', _sendAb),
+                      _button('AUF', _sendAuf),
+                      _button('ENTER', _sendEnter),
+                    ]),
+                  ],
                 ),
-                const SizedBox(height: 18),
-                _buttonRow([
-                  _button('Menu', _sendMenu),
-                  _button('Monitor', _sendMonitor),
-                  _button('Errors', _sendErrors),
-                ]),
-                const SizedBox(height: 10),
-                _buttonRow([
-                  _button('QUIT', _sendQuit),
-                  _button('AB', _sendAb),
-                  _button('AUF', _sendAuf),
-                  _button('ENTER', _sendEnter),
-                ]),
-              ],
+              ),
             ),
           ),
         ),
-      ),
-    );
-  }
+      );
+    }
 }
