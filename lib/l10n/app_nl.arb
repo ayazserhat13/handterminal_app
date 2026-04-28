@@ -1,0 +1,53 @@
+{
+  "appTitle": "Handterminal App",
+  "screenTitle": "TFT-schermsimulatie",
+
+  "menu": "MENU",
+  "display": "Display",
+  "graph": "Grafiek",
+  "connection": "Verbinding",
+  "settings": "Instellingen",
+  "monitoring": "Monitoring",
+  "errors": "Fouten",
+  "info": "Info",
+
+  "quit": "Quit",
+  "down": "Omlaag",
+  "up": "Omhoog",
+  "enter": "Enter",
+
+  "lcdLineHello": "Hallo Wereld!  ",
+  "lcdLineFloor": "Verdieping: 3 ↑ ",
+  "lcdLineReady": "Systeem gereed.",
+  "lcdLineNoError": "Geen fout      ",
+
+  "fb10Display": "FB10-display",
+  "errorLed": "FOUT",
+  "operateLed": "BEDRIJF",
+  "monitor": "Monitor",
+  "ab": "OMLAAG",
+  "auf": "OMHOOG",
+
+  "statusPreparingConnection": "Verbinding wordt voorbereid...",
+  "statusHandshakeStarting": "Handshake wordt gestart...",
+  "statusWaitingForBb": "Wachten op 0xBB...",
+  "statusFirstBbReceived": "Eerste 0xBB ontvangen, 0xAA wordt verzonden...",
+  "statusSecondBbReceived": "Tweede 0xBB ontvangen, terminal wordt gestart...",
+  "statusTerminalReady": "Terminal gereed",
+  "statusKeySendError": "Fout bij verzenden van toets",
+  "statusBbTimeout": "Timeout: 0xBB niet ontvangen",
+
+  "statusHandshakeError": "Handshake-fout: {error}",
+  "@statusHandshakeError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+
+  "statusTerminalStartError": "Fout bij starten van terminal: {error}",
+  "@statusTerminalStartError": {
+    "placeholders": {
+      "error": {}
+    }
+  }
+}

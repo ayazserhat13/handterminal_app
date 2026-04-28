@@ -1,0 +1,53 @@
+{
+  "appTitle": "Handterminal App",
+  "screenTitle": "TFT Display Simulation",
+
+  "menu": "MENÜ",
+  "display": "Display",
+  "graph": "Grafik",
+  "connection": "Verbindung",
+  "settings": "Einstellungen",
+  "monitoring": "Überwachung",
+  "errors": "Fehler",
+  "info": "Info",
+
+  "quit": "Quit",
+  "down": "Runter",
+  "up": "Hoch",
+  "enter": "Enter",
+
+  "lcdLineHello": "Hello World!   ",
+  "lcdLineFloor": "Floor: 3 Up    ",
+  "lcdLineReady": "System Ready...",
+  "lcdLineNoError": "No Error       ",
+
+  "fb10Display": "FB10 Display",
+  "errorLed": "FEHLER",
+  "operateLed": "BETRIEB",
+  "monitor": "Monitor",
+  "ab": "AB",
+  "auf": "AUF",
+
+  "statusPreparingConnection": "Verbindung wird vorbereitet...",
+  "statusHandshakeStarting": "Handshake wird gestartet...",
+  "statusWaitingForBb": "Warte auf 0xBB...",
+  "statusFirstBbReceived": "Erstes 0xBB empfangen, 0xAA wird gesendet...",
+  "statusSecondBbReceived": "Zweites 0xBB empfangen, Terminal wird gestartet...",
+  "statusTerminalReady": "Terminal bereit",
+  "statusKeySendError": "Fehler beim Senden der Taste",
+  "statusBbTimeout": "Timeout: 0xBB nicht empfangen",
+
+  "statusHandshakeError": "Handshake-Fehler: {error}",
+  "@statusHandshakeError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+
+  "statusTerminalStartError": "Fehler beim Starten des Terminals: {error}",
+  "@statusTerminalStartError": {
+    "placeholders": {
+      "error": {}
+    }
+  }
+}

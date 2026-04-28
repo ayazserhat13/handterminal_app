@@ -13,18 +13,36 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_blue_plus: ^1.34.5
   flutter_blue_plus_winrt: ^0.0.18
+  flutter_localizations:
+    sdk: flutter
+  intl: any
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.4.0   # 👈 EKLENDİ
 
 flutter_launcher_icons:
   ios: true
   android: true
   image_path: "assets/icon/app_icon.png"
-  
-flutter:
-  uses-material-design: true
 
+flutter:
+  generate: true
+  uses-material-design: true
+  assets:
+    - assets/icon/app_icon.png
+    
+# 👇 SPLASH CONFIG
+flutter_native_splash:
+  color: "#000000"
+  image: assets/icon/app_icon.png
+
+  android: true
+  ios: true
+
+  android_12:
+    color: "#000000"
+    image: assets/icon/app_icon.png

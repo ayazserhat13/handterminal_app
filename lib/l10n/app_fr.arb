@@ -1,0 +1,53 @@
+{
+  "appTitle": "Application terminal",
+  "screenTitle": "Simulation écran TFT",
+
+  "menu": "MENU",
+  "display": "Affichage",
+  "graph": "Graphique",
+  "connection": "Connexion",
+  "settings": "Paramètres",
+  "monitoring": "Surveillance",
+  "errors": "Erreurs",
+  "info": "Info",
+
+  "quit": "Quitter",
+  "down": "Bas",
+  "up": "Haut",
+  "enter": "Entrer",
+
+  "lcdLineHello": "Bonjour Monde! ",
+  "lcdLineFloor": "Étage: 3 Haut  ",
+  "lcdLineReady": "Système prêt...",
+  "lcdLineNoError": "Aucune erreur  ",
+
+  "fb10Display": "Écran FB10",
+  "errorLed": "ERREUR",
+  "operateLed": "MARCHE",
+  "monitor": "Surveillance",
+  "ab": "BAS",
+  "auf": "HAUT",
+
+  "statusPreparingConnection": "Préparation de la connexion...",
+  "statusHandshakeStarting": "Démarrage du handshake...",
+  "statusWaitingForBb": "Attente de 0xBB...",
+  "statusFirstBbReceived": "Premier 0xBB reçu, envoi de 0xAA...",
+  "statusSecondBbReceived": "Deuxième 0xBB reçu, démarrage du terminal...",
+  "statusTerminalReady": "Terminal prêt",
+  "statusKeySendError": "Erreur d'envoi de touche",
+  "statusBbTimeout": "Timeout : 0xBB non reçu",
+
+  "statusHandshakeError": "Erreur de handshake : {error}",
+  "@statusHandshakeError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+
+  "statusTerminalStartError": "Erreur de démarrage du terminal : {error}",
+  "@statusTerminalStartError": {
+    "placeholders": {
+      "error": {}
+    }
+  }
+}

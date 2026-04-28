@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:handterminal_app/l10n/app_localizations.dart';
 
 enum DisplaySessionState {
   idle,
@@ -26,6 +27,11 @@ class DisplayScreen extends StatefulWidget {
 
 class _DisplayScreenState extends State<DisplayScreen> {
   static const int _idleKey = 0xAF;
+  
+  Timer? _idlePollTimer;
+  bool _writeInProgress = false;
+  DateTime _lastKeySentAt = DateTime.fromMillisecondsSinceEpoch(0);
+  
   int? _lockedOffset;
   List<String> lines = const [
     '                ',
@@ -38,7 +44,7 @@ class _DisplayScreenState extends State<DisplayScreen> {
   bool ledRight = false;
 
   DisplaySessionState sessionState = DisplaySessionState.idle;
-  String statusText = 'Bağlantı hazırlanıyor...';
+  String statusText = '';
 
   StreamSubscription<List<int>>? _notifyStreamSub;
   final List<int> _frameBuffer = <int>[];
@@ -66,40 +72,65 @@ class _DisplayScreenState extends State<DisplayScreen> {
   }
 
   @override
-  void dispose() {
-    _notifyStreamSub?.cancel();
-    _handshakeTimer?.cancel();
-    super.dispose();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    if (statusText.isEmpty) {
+      statusText = AppLocalizations.of(context)!.statusPreparingConnection;
+    }
   }
 
+  @override
+  void dispose() {
+      _idlePollTimer?.cancel();
+      _notifyStreamSub?.cancel();
+      _handshakeTimer?.cancel();
+      super.dispose();
+  }
+  
   void _log(String text) {
     //debugPrint('DISPLAY: $text');
   }
 
   Future<void> _writeBytes(List<int> bytes) async {
-    await widget.writeCharacteristic.write(
-      bytes,
-      withoutResponse: widget.writeCharacteristic.properties.writeWithoutResponse,
-    );
+      if (_writeInProgress) {
+        _log('WRITE skipped, already in progress');
+        return;
+      }
 
-    _log(
-      'TX LEN: ${bytes.length} | HEX: ${bytes.map((e) => e.toRadixString(16).padLeft(2, '0')).join(' ')}',
-    );
+      _writeInProgress = true;
+
+      try {
+        await widget.writeCharacteristic.write(
+          bytes,
+          withoutResponse: widget.writeCharacteristic.properties.writeWithoutResponse,
+        );
+
+        _log(
+          'TX LEN: ${bytes.length} | HEX: ${bytes.map((e) => e.toRadixString(16).padLeft(2, '0')).join(' ')}',
+        );
+      } finally {
+        _writeInProgress = false;
+      }
   }
 
   Future<void> _sendIdlePoll() async {
-    if (sessionState != DisplaySessionState.terminalReady) return;
-    if (_pollInFlight) return;
+      if (sessionState != DisplaySessionState.terminalReady) return;
+      if (_writeInProgress) return;
 
-    _pollInFlight = true;
-    _suppressSingleByteEcho = true;
+      final now = DateTime.now();
 
-    try {
-      await _writeBytes(const [_idleKey]);
-    } catch (e) {
-      _log('IDLE POLL ERROR: $e');
-      _pollInFlight = false;
-    }
+      // Tuştan hemen sonra idle poll gönderme
+      if (now.difference(_lastKeySentAt).inMilliseconds < 500) {
+        return;
+      }
+
+      try {
+        _suppressSingleByteEcho = true;
+        await _writeBytes(const [_idleKey]);
+      } catch (e) {
+        _log('IDLE POLL ERROR: $e');
+      }
   }
 
   void _listenNotify() {
@@ -143,7 +174,7 @@ class _DisplayScreenState extends State<DisplayScreen> {
     try {
       setState(() {
         sessionState = DisplaySessionState.handshaking;
-        statusText = 'Handshake başlatılıyor...';
+        statusText = AppLocalizations.of(context)!.statusHandshakeStarting;
       });
 
       _frameBuffer.clear();
@@ -168,7 +199,7 @@ class _DisplayScreenState extends State<DisplayScreen> {
           if (mounted) {
             setState(() {
               sessionState = DisplaySessionState.error;
-              statusText = 'Timeout: 0xBB alınamadı';
+              statusText = AppLocalizations.of(context)!.statusBbTimeout;
             });
           }
           return;
@@ -184,12 +215,12 @@ class _DisplayScreenState extends State<DisplayScreen> {
       });
 
       setState(() {
-        statusText = '0xBB bekleniyor...';
+        statusText = AppLocalizations.of(context)!.statusWaitingForBb;
       });
     } catch (e) {
       setState(() {
         sessionState = DisplaySessionState.error;
-        statusText = 'Handshake hatası: $e';
+        statusText = AppLocalizations.of(context)!.statusHandshakeError(e.toString());
       });
     } finally {
       _busySending = false;
@@ -210,7 +241,7 @@ class _DisplayScreenState extends State<DisplayScreen> {
       _waitingForSecondBb = true;
 
       setState(() {
-        statusText = 'İlk 0xBB alındı, 0xAA gönderiliyor...';
+        statusText = AppLocalizations.of(context)!.statusFirstBbReceived;
       });
 
       await _writeBytes(const [0xAA]);
@@ -226,7 +257,7 @@ class _DisplayScreenState extends State<DisplayScreen> {
       _waitingForSecondBb = false;
 
       setState(() {
-        statusText = 'İkinci 0xBB alındı, terminal başlatılıyor...';
+        statusText = AppLocalizations.of(context)!.statusSecondBbReceived;
       });
 
       await _startTerminalMode();
@@ -244,8 +275,10 @@ class _DisplayScreenState extends State<DisplayScreen> {
 
       setState(() {
         sessionState = DisplaySessionState.terminalReady;
-        statusText = 'Terminal hazır';
+        statusText = AppLocalizations.of(context)!.statusTerminalReady;
       });
+      
+      _startIdlePolling();
 
       // İlk ekran için ilk idle poll
       await Future.delayed(const Duration(milliseconds: 60));
@@ -253,9 +286,20 @@ class _DisplayScreenState extends State<DisplayScreen> {
     } catch (e) {
       setState(() {
         sessionState = DisplaySessionState.error;
-        statusText = 'Terminal başlatma hatası: $e';
+        statusText = AppLocalizations.of(context)!.statusTerminalStartError(e.toString());
       });
     }
+  }
+  
+  void _startIdlePolling() {
+      _idlePollTimer?.cancel();
+
+      _idlePollTimer = Timer.periodic(
+        const Duration(milliseconds: 600),
+        (_) {
+          _sendIdlePoll();
+        },
+      );
   }
 
   bool _isDisplayChar(int b) {
@@ -368,7 +412,7 @@ void _consumeFrames() {
 
       ledLeft = (status & 0x02) != 0;
       ledRight = (status & 0x01) != 0;
-      statusText = 'Terminal hazır';
+      statusText = AppLocalizations.of(context)!.statusTerminalReady;
     });
 
     // Frame geldi, artık yeni poll gönderebiliriz
@@ -376,10 +420,9 @@ void _consumeFrames() {
     _waitingForFrameAfterKey = false;
     _suppressSingleByteEcho = false;
 
-    Future.microtask(() async {
-      await Future.delayed(const Duration(milliseconds: 150));
-      await _sendIdlePoll();
-    });
+    _pollInFlight = false;
+    _waitingForFrameAfterKey = false;
+    _suppressSingleByteEcho = false;
   }
 
   String _decodeScreen(List<int> bytes) {
@@ -423,32 +466,35 @@ void _consumeFrames() {
   }
 
   Future<void> _sendKeyByte(int value) async {
-    if (sessionState != DisplaySessionState.terminalReady) {
-      _log('Key ignored, terminal not ready');
-      return;
-    }
+      if (sessionState != DisplaySessionState.terminalReady) {
+        _log('Key ignored, terminal not ready');
+        return;
+      }
 
-    if (_waitingForFrameAfterKey) {
-      _log('Previous key still waiting for next frame');
-      return;
-    }
+      if (_writeInProgress) {
+        _log('Key ignored, write in progress');
+        return;
+      }
 
-    try {
-      _waitingForFrameAfterKey = true;
-      _pollInFlight = true;
-      _suppressSingleByteEcho = true;
+      try {
+        _lastKeySentAt = DateTime.now();
 
-      await _writeBytes([value]);
-      await Future.delayed(const Duration(milliseconds: 60));
-    } catch (e) {
-      _log('KEY SEND ERROR: $e');
-      _waitingForFrameAfterKey = false;
-      _pollInFlight = false;
+        _waitingForFrameAfterKey = false;
+        _pollInFlight = false;
+        _suppressSingleByteEcho = true;
 
-      setState(() {
-        statusText = 'Tuş gönderim hatası';
-      });
-    }
+        await _writeBytes([value]);
+      } catch (e) {
+        _log('KEY SEND ERROR: $e');
+
+        _waitingForFrameAfterKey = false;
+        _pollInFlight = false;
+        _suppressSingleByteEcho = false;
+
+        setState(() {
+          statusText = AppLocalizations.of(context)!.statusKeySendError;
+        });
+      }
   }
 
   Future<void> _sendQuit() => _sendKeyByte(0xA7);
@@ -586,10 +632,12 @@ Widget _buttonRow(List<Widget> children) {
   
     @override
     Widget build(BuildContext context) {
+      final l10n = AppLocalizations.of(context)!;
+
       return Scaffold(
         backgroundColor: const Color(0xFF202124),
         appBar: AppBar(
-          title: const Text('FB10 Display'),
+          title: Text(l10n.fb10Display),
           backgroundColor: Colors.blueGrey,
         ),
         body: SafeArea(
@@ -620,9 +668,9 @@ Widget _buttonRow(List<Widget> children) {
                         children: [
                           Column(
                             children: [
-                              const Text(
-                                'ERROR',
-                                style: TextStyle(
+                              Text(
+                                l10n.errorLed,
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
@@ -635,9 +683,9 @@ Widget _buttonRow(List<Widget> children) {
                           ),
                           Column(
                             children: [
-                              const Text(
-                                'OPERATE',
-                                style: TextStyle(
+                              Text(
+                                l10n.operateLed,
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
@@ -674,16 +722,16 @@ Widget _buttonRow(List<Widget> children) {
                     ),
                     const SizedBox(height: 18),
                     _buttonRow([
-                      _button('Menu', _sendMenu),
-                      _button('Monitor', _sendMonitor),
-                      _button('Errors', _sendErrors),
+                      _button(l10n.menu, _sendMenu),
+                      _button(l10n.monitor, _sendMonitor),
+                      _button(l10n.errors, _sendErrors),
                     ]),
                     const SizedBox(height: 10),
                     _buttonRow([
-                      _button('QUIT', _sendQuit),
-                      _button('AB', _sendAb),
-                      _button('AUF', _sendAuf),
-                      _button('ENTER', _sendEnter),
+                      _button(l10n.quit, _sendQuit),
+                      _button(l10n.ab, _sendAb),
+                      _button(l10n.auf, _sendAuf),
+                      _button(l10n.enter, _sendEnter),
                     ]),
                   ],
                 ),

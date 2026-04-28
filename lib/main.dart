@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:handterminal_app/l10n/app_localizations.dart';
+
 import 'bluetooth.dart';
 import 'graph_screen.dart';
+import 'splash_screen.dart';
 
 void main() {
   runApp(const LcdApp());
@@ -13,8 +17,33 @@ class LcdApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Handterminal App',
-      home: const MainScreen(),
+      onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en'),
+        Locale('de'),
+        Locale('fr'),
+        Locale('nl'),
+      ],
+      localeResolutionCallback: (deviceLocale, supportedLocales) {
+        if (deviceLocale == null) {
+          return const Locale('en');
+        }
+
+        for (var locale in supportedLocales) {
+          if (locale.languageCode == deviceLocale.languageCode) {
+            return locale;
+          }
+        }
+
+        return const Locale('en');
+      },
+      home: const SplashScreen(),
     );
   }
 }
@@ -22,29 +51,33 @@ class LcdApp extends StatelessWidget {
 class MainScreen extends StatelessWidget {
   const MainScreen({super.key});
 
-  static const List<String> lcdLines = [
-    'Merhaba Dünya!  ',
-    'Kat: 3 Yukarı   ',
-    'Sistem Hazır... ',
-    'Hata Yok        ',
-  ];
+  List<String> _lcdLines(AppLocalizations l10n) {
+    return [
+      l10n.lcdLineHello,
+      l10n.lcdLineFloor,
+      l10n.lcdLineReady,
+      l10n.lcdLineNoError,
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: Colors.black,
       drawer: const AppDrawer(),
       appBar: AppBar(
-        title: const Text('TFT Ekran Simülasyonu'),
+        title: Text(l10n.screenTitle),
         backgroundColor: Colors.blueGrey,
       ),
-      body: const Center(
+      body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            LCDScreen(lines: lcdLines),
-            SizedBox(height: 20),
-            ButtonRow(),
+            LCDScreen(lines: _lcdLines(l10n)),
+            const SizedBox(height: 20),
+            const ButtonRow(),
           ],
         ),
       ),
@@ -57,16 +90,18 @@ class AppDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Drawer(
       backgroundColor: Colors.blueGrey,
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          const DrawerHeader(
-            decoration: BoxDecoration(color: Colors.black87),
+          DrawerHeader(
+            decoration: const BoxDecoration(color: Colors.black87),
             child: Text(
-              'MENÜ',
-              style: TextStyle(
+              l10n.menu,
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 24,
                 fontFamily: 'Courier',
@@ -74,14 +109,14 @@ class AppDrawer extends StatelessWidget {
             ),
           ),
           MenuItem(
-            title: 'Display',
+            title: l10n.display,
             icon: Icons.desktop_windows,
             onTap: () {
               Navigator.pop(context);
             },
           ),
           MenuItem(
-            title: 'Grafik',
+            title: l10n.graph,
             icon: Icons.show_chart,
             onTap: () {
               Navigator.pop(context);
@@ -94,7 +129,7 @@ class AppDrawer extends StatelessWidget {
             },
           ),
           MenuItem(
-            title: 'Bağlantı',
+            title: l10n.connection,
             icon: Icons.bluetooth,
             onTap: () {
               Navigator.pop(context);
@@ -107,35 +142,35 @@ class AppDrawer extends StatelessWidget {
             },
           ),
           MenuItem(
-            title: 'Ayarlar',
+            title: l10n.settings,
             icon: Icons.settings,
             onTap: () {
               Navigator.pop(context);
-              debugPrint('Ayarlar seçildi');
+              debugPrint('Settings selected');
             },
           ),
           MenuItem(
-            title: 'İzleme',
+            title: l10n.monitoring,
             icon: Icons.visibility,
             onTap: () {
               Navigator.pop(context);
-              debugPrint('İzleme seçildi');
+              debugPrint('Monitoring selected');
             },
           ),
           MenuItem(
-            title: 'Hatalar',
+            title: l10n.errors,
             icon: Icons.error,
             onTap: () {
               Navigator.pop(context);
-              debugPrint('Hatalar seçildi');
+              debugPrint('Errors selected');
             },
           ),
           MenuItem(
-            title: 'Info',
+            title: l10n.info,
             icon: Icons.info,
             onTap: () {
               Navigator.pop(context);
-              debugPrint('Info seçildi');
+              debugPrint('Info selected');
             },
           ),
         ],
@@ -220,27 +255,29 @@ class ButtonRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         PushButton(
-          label: 'Quit',
-          onPressed: () => debugPrint('Quit basıldı'),
+          label: l10n.quit,
+          onPressed: () => debugPrint('Quit pressed'),
         ),
         const SizedBox(width: 12),
         PushButton(
-          label: 'Down',
-          onPressed: () => debugPrint('Down basıldı'),
+          label: l10n.down,
+          onPressed: () => debugPrint('Down pressed'),
         ),
         const SizedBox(width: 12),
         PushButton(
-          label: 'Up',
-          onPressed: () => debugPrint('Up basıldı'),
+          label: l10n.up,
+          onPressed: () => debugPrint('Up pressed'),
         ),
         const SizedBox(width: 12),
         PushButton(
-          label: 'Enter',
-          onPressed: () => debugPrint('Enter basıldı'),
+          label: l10n.enter,
+          onPressed: () => debugPrint('Enter pressed'),
         ),
       ],
     );

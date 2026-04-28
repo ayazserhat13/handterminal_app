@@ -425,11 +425,15 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: (_writeCharacteristic != null && _notifyCharacteristic != null)
-                        ? () {
+                        ? () async {
                             final writeChar = _writeCharacteristic!;
                             final notifyChar = _notifyCharacteristic!;
-
-                            Navigator.push(
+                            await _notifySub?.cancel();
+                            _notifySub = null;
+                            
+                            if (!context.mounted) return;
+                            
+                            await Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => DisplayScreen(
