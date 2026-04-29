@@ -32,6 +32,8 @@ class _DisplayScreenState extends State<DisplayScreen> {
   bool _writeInProgress = false;
   DateTime _lastKeySentAt = DateTime.fromMillisecondsSinceEpoch(0);
   
+  bool _keySequenceInProgress = false;
+  
   int? _lockedOffset;
   List<String> lines = const [
     '                ',
@@ -116,12 +118,13 @@ class _DisplayScreenState extends State<DisplayScreen> {
 
   Future<void> _sendIdlePoll() async {
       if (sessionState != DisplaySessionState.terminalReady) return;
+      if (_keySequenceInProgress) return;
       if (_writeInProgress) return;
 
       final now = DateTime.now();
 
       // Tuştan hemen sonra idle poll gönderme
-      if (now.difference(_lastKeySentAt).inMilliseconds < 500) {
+      if (now.difference(_lastKeySentAt).inMilliseconds < 300) {
         return;
       }
 
@@ -295,7 +298,7 @@ class _DisplayScreenState extends State<DisplayScreen> {
       _idlePollTimer?.cancel();
 
       _idlePollTimer = Timer.periodic(
-        const Duration(milliseconds: 600),
+        const Duration(milliseconds: 500),
         (_) {
           _sendIdlePoll();
         },
@@ -398,8 +401,35 @@ void _consumeFrames() {
 }
 
   void _parseFrame(List<int> data) {
-    final screenBytes = data.sublist(0, 64);
-    final status = data[64];
+    
+    List<int> frame = data;
+
+    final decodedNormal = _decodeScreen(frame.sublist(0, 64));
+
+    final looksShiftedRight =
+        decodedNormal.startsWith(' ') &&
+        !decodedNormal.substring(1, 16).contains(RegExp(r'\s{8,}'));
+
+    if (looksShiftedRight && _frameBuffer.isNotEmpty) {
+        final shifted = <int>[
+            ...frame.sublist(1),
+            _frameBuffer.removeAt(0),
+        ];
+
+        if (_looksLikeValidFrame(shifted)) {
+            _log('Frame corrected by shifting left 1 byte');
+            frame = shifted;
+        }
+    }
+
+    final screenBytes = frame.sublist(0, 64);
+    final status = frame[64];
+      
+    if ((status & 0xF0) != 0x50) {
+        _log('Invalid status byte ignored: ${status.toRadixString(16)}');
+        return;
+    }
+    
     final decoded = _decodeScreen(screenBytes);
 
     setState(() {
@@ -471,10 +501,12 @@ void _consumeFrames() {
         return;
       }
 
-      if (_writeInProgress) {
-        _log('Key ignored, write in progress');
+      if (_keySequenceInProgress) {
+        _log('Key ignored, key sequence in progress');
         return;
       }
+
+      _keySequenceInProgress = true;
 
       try {
         _lastKeySentAt = DateTime.now();
@@ -483,17 +515,30 @@ void _consumeFrames() {
         _pollInFlight = false;
         _suppressSingleByteEcho = true;
 
+        // 1) Tuş basıldı
         await _writeBytes([value]);
+
+        // 2) Cihazın tuşu algılaması için kısa süre
+        await Future.delayed(const Duration(milliseconds: 160));
+
+        // 3) Tuş bırakıldı / idle
+        await _writeBytes(const [_idleKey]);
+
+        // 4) Sürücünün repeat'e girmemesi için kısa koruma
+        await Future.delayed(const Duration(milliseconds: 250));
+
+        _lastKeySentAt = DateTime.now();
       } catch (e) {
         _log('KEY SEND ERROR: $e');
-
-        _waitingForFrameAfterKey = false;
-        _pollInFlight = false;
-        _suppressSingleByteEcho = false;
 
         setState(() {
           statusText = AppLocalizations.of(context)!.statusKeySendError;
         });
+      } finally {
+        _waitingForFrameAfterKey = false;
+        _pollInFlight = false;
+        _suppressSingleByteEcho = false;
+        _keySequenceInProgress = false;
       }
   }
 
@@ -533,7 +578,7 @@ void _consumeFrames() {
 
 Widget _display() {
   return Container(
-    width: 250,
+    width: 260,
     height: 162,
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
     decoration: BoxDecoration(
