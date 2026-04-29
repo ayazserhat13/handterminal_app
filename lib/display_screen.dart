@@ -28,11 +28,37 @@ class DisplayScreen extends StatefulWidget {
 class _DisplayScreenState extends State<DisplayScreen> {
   static const int _idleKey = 0xAF;
   
+  int? _heldKeyValue;
+  bool _heldKeyActive = false;
+
   Timer? _idlePollTimer;
   bool _writeInProgress = false;
   DateTime _lastKeySentAt = DateTime.fromMillisecondsSinceEpoch(0);
-  
+
   bool _keySequenceInProgress = false;
+  
+  void _startLongPress(int key) async {
+      if (_heldKeyActive) return;
+
+      _heldKeyActive = true;
+      _heldKeyValue = key;
+
+      _pollInFlight = false;
+      _suppressSingleByteEcho = true;
+
+      await _writeBytes([key]);
+  }
+
+  void _stopLongPress() async {
+      if (!_heldKeyActive) return;
+
+      _heldKeyActive = false;
+      _heldKeyValue = null;
+
+      await _writeBytes(const [_idleKey]);
+
+      _lastKeySentAt = DateTime.now();
+  }
   
   int? _lockedOffset;
   List<String> lines = const [
@@ -117,6 +143,8 @@ class _DisplayScreenState extends State<DisplayScreen> {
   }
 
   Future<void> _sendIdlePoll() async {
+      if (_heldKeyActive) return;
+      
       if (sessionState != DisplaySessionState.terminalReady) return;
       if (_keySequenceInProgress) return;
       if (_writeInProgress) return;
@@ -310,30 +338,30 @@ class _DisplayScreenState extends State<DisplayScreen> {
   }
 
   bool _looksLikeValidFrame(List<int> frame) {
-  if (frame.length != 65) return false;
+      if (frame.length != 65) return false;
 
-  final status = frame[64];
+      final status = frame[64];
 
-  // Status mutlaka 0x5? olmalı
-  if ((status & 0xF0) != 0x50) return false;
+      // Status mutlaka 0x5? olmalı
+      if ((status & 0xF0) != 0x50) return false;
 
-  // Ekran karakter kalitesi
-  final printableCount = frame.sublist(0, 64).where((b) {
-    return (b >= 32 && b <= 126) || b >= 128;
-  }).length;
+      // Ekran karakter kalitesi
+      final printableCount = frame.sublist(0, 64).where((b) {
+        return (b >= 32 && b <= 126) || b >= 128;
+      }).length;
 
-  // Daha sıkı threshold (önceden 40 idi)
-  if (printableCount < 52) return false;
+      // Daha sıkı threshold (önceden 40 idi)
+      if (printableCount < 52) return false;
 
-  // Çok fazla kontrol karakteri varsa reddet
-  final controlCount = frame.sublist(0, 64).where((b) {
-    return b < 32 && b != 0 && b != 1 && b != 2;
-  }).length;
+      // Çok fazla kontrol karakteri varsa reddet
+      final controlCount = frame.sublist(0, 64).where((b) {
+        return b < 32 && b != 0 && b != 1 && b != 2;
+      }).length;
 
-  if (controlCount > 4) return false;
+      if (controlCount > 4) return false;
 
-  return true;
-}
+      return true;
+  }
 
 void _consumeFrames() {
   while (_frameBuffer.length >= 65) {
@@ -449,10 +477,19 @@ void _consumeFrames() {
     _pollInFlight = false;
     _waitingForFrameAfterKey = false;
     _suppressSingleByteEcho = false;
+    
+    if (_heldKeyActive && _heldKeyValue != null) {
+      Future.delayed(const Duration(milliseconds: 60), () async {
+        if (!mounted) return;
+        if (!_heldKeyActive) return;
+        if (_heldKeyValue == null) return;
+        if (_writeInProgress) return;
 
-    _pollInFlight = false;
-    _waitingForFrameAfterKey = false;
-    _suppressSingleByteEcho = false;
+        _pollInFlight = false;
+        _suppressSingleByteEcho = true;
+        await _writeBytes([_heldKeyValue!]);
+      });
+    }
   }
 
   String _decodeScreen(List<int> bytes) {
@@ -774,8 +811,21 @@ Widget _buttonRow(List<Widget> children) {
                     const SizedBox(height: 10),
                     _buttonRow([
                       _button(l10n.quit, _sendQuit),
-                      _button(l10n.ab, _sendAb),
-                      _button(l10n.auf, _sendAuf),
+                      
+                      GestureDetector(
+                          onLongPressStart: (_) => _startLongPress(0xAB),
+                          onLongPressEnd: (_) => _stopLongPress(),
+                          onTap: _sendAb,
+                          child: _button(l10n.ab, _sendAb),
+                      ),
+
+                      GestureDetector(
+                          onLongPressStart: (_) => _startLongPress(0xAD),
+                          onLongPressEnd: (_) => _stopLongPress(),
+                          onTap: _sendAuf,
+                          child: _button(l10n.auf, _sendAuf),
+                      ),
+                      
                       _button(l10n.enter, _sendEnter),
                     ]),
                   ],
