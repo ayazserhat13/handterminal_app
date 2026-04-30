@@ -690,6 +690,41 @@ Widget _button(String text, VoidCallback onPressed) {
     ),
   );
 }
+
+Widget _roundPrimaryButton(String text, VoidCallback onPressed) {
+  const blue = Color(0xFF0A4C93);
+
+  return SizedBox(
+    width: 68,
+    height: 68,
+    child: ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: blue,
+        foregroundColor: Colors.white,
+        shape: const CircleBorder(),
+        elevation: 5,
+        shadowColor: blue.withOpacity(0.35),
+        padding: const EdgeInsets.all(8),
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          text,
+          maxLines: 1,
+          softWrap: false,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.2,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 Widget _buttonRow(List<Widget> children) {
   return SizedBox(
     width: 342,
@@ -717,11 +752,7 @@ Widget _buttonRow(List<Widget> children) {
       final l10n = AppLocalizations.of(context)!;
 
       return Scaffold(
-        backgroundColor: const Color(0xFF202124),
-        appBar: AppBar(
-          title: Text(l10n.fb10Display),
-          backgroundColor: Colors.blueGrey,
-        ),
+        backgroundColor: Colors.black.withOpacity(0.45),
         body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -729,20 +760,42 @@ Widget _buttonRow(List<Widget> children) {
                 width: 382,
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF5F676D),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: Colors.black87, width: 2),
-                  boxShadow: const [
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFFE8E8E8),
+                      Color(0xFFC9CDD1),
+                      Color(0xFFF4F4F4),
+                      Color(0xFFB8BEC4),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: Color(0xFF8A9299),
+                    width: 2,
+                  ),
+                  boxShadow: [
                     BoxShadow(
-                      color: Colors.black54,
-                      blurRadius: 16,
-                      offset: Offset(4, 8),
+                      color: Colors.black.withOpacity(0.35),
+                      blurRadius: 22,
+                      offset: const Offset(0, 12),
                     ),
                   ],
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                  
+                    Align(
+                        alignment: Alignment.centerRight,
+                        child: IconButton(
+                            icon: const Icon(Icons.close),
+                            color: Colors.black87,
+                            onPressed: () => Navigator.pop(context),
+                        ),
+                    ),
+                    
                     SizedBox(
                       width: 180,
                       child: Row(
@@ -753,7 +806,7 @@ Widget _buttonRow(List<Widget> children) {
                               Text(
                                 l10n.errorLed,
                                 style: const TextStyle(
-                                  color: Colors.white,
+                                  color: Colors.black87,
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 0.8,
@@ -768,7 +821,7 @@ Widget _buttonRow(List<Widget> children) {
                               Text(
                                 l10n.operateLed,
                                 style: const TextStyle(
-                                  color: Colors.white,
+                                  color: Colors.black87,
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 0.8,
@@ -794,7 +847,7 @@ Widget _buttonRow(List<Widget> children) {
                             child: Text(
                               statusText,
                               style: const TextStyle(
-                                color: Colors.white,
+                                color: Colors.black87,
                                 fontSize: 12,
                               ),
                             ),
@@ -810,23 +863,23 @@ Widget _buttonRow(List<Widget> children) {
                     ]),
                     const SizedBox(height: 10),
                     _buttonRow([
-                      _button(l10n.quit, _sendQuit),
-                      
+                      _roundPrimaryButton(l10n.quit, _sendQuit),
+
                       GestureDetector(
-                          onLongPressStart: (_) => _startLongPress(0xAB),
-                          onLongPressEnd: (_) => _stopLongPress(),
-                          onTap: _sendAb,
-                          child: _button(l10n.ab, _sendAb),
+                        onLongPressStart: (_) => _startLongPress(0xAB),
+                        onLongPressEnd: (_) => _stopLongPress(),
+                        onTap: _sendAb,
+                        child: _roundPrimaryButton(l10n.ab, _sendAb),
                       ),
 
                       GestureDetector(
-                          onLongPressStart: (_) => _startLongPress(0xAD),
-                          onLongPressEnd: (_) => _stopLongPress(),
-                          onTap: _sendAuf,
-                          child: _button(l10n.auf, _sendAuf),
+                        onLongPressStart: (_) => _startLongPress(0xAD),
+                        onLongPressEnd: (_) => _stopLongPress(),
+                        onTap: _sendAuf,
+                        child: _roundPrimaryButton(l10n.auf, _sendAuf),
                       ),
-                      
-                      _button(l10n.enter, _sendEnter),
+
+                      _roundPrimaryButton(l10n.enter, _sendEnter),
                     ]),
                   ],
                 ),

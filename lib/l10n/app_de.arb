@@ -61,5 +61,29 @@
   "homeDocuments": "Dokumente",
   "homeAbout": "Info",
   "homeNotConnected": "Nicht verbunden",
-  "homeConnectHint": "Bitte verbinden Sie sich per Bluetooth mit dem Gerät."
+  "homeConnectHint": "Bitte verbinden Sie sich per Bluetooth mit dem Gerät.",
+  
+  "bluetoothTitle": "Bluetooth-Verbindung",
+  "bluetoothReady": "Bereit",
+  "bluetoothScanning": "Geräte werden gesucht...",
+  "bluetoothScanComplete": "Suche abgeschlossen",
+  "bluetoothNoDevicesFound": "Keine Geräte gefunden",
+  "bluetoothUnknownDevice": "Unbekanntes Gerät",
+  "bluetoothScan": "Suchen",
+  "bluetoothStop": "Stoppen",
+  "bluetoothNotSupported": "Dieses Gerät unterstützt BLE nicht",
+  "bluetoothScanError": "Fehler bei der Suche",
+  "bluetoothStopError": "Fehler beim Stoppen",
+  "bluetoothStopped": "Suche gestoppt",
+  "bluetoothConnecting": "{deviceName} wird verbunden...",
+  "@bluetoothConnecting": {
+    "placeholders": {
+      "deviceName": {}
+    }
+  },
+  "bluetoothMissingCharacteristics": "Verbunden, aber erforderliche Merkmale wurden nicht gefunden",
+  "bluetoothConnectionError": "Verbindungsfehler",
+  "bluetoothConnectionLost": "Bluetooth-Verbindung verloren",
+  "bluetoothTurnOnRequired": "Bluetooth muss eingeschaltet sein",
+  "bluetoothReconnecting": "Verbindung wird wiederhergestellt..."
 }

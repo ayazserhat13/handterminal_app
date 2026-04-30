@@ -149,4 +149,61 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String get homeConnectHint =>
       'Maak verbinding met het apparaat via Bluetooth.';
+
+  @override
+  String get bluetoothTitle => 'Bluetooth-verbinding';
+
+  @override
+  String get bluetoothReady => 'Gereed';
+
+  @override
+  String get bluetoothScanning => 'Apparaten zoeken...';
+
+  @override
+  String get bluetoothScanComplete => 'Zoeken voltooid';
+
+  @override
+  String get bluetoothNoDevicesFound => 'Geen apparaten gevonden';
+
+  @override
+  String get bluetoothUnknownDevice => 'Onbekend apparaat';
+
+  @override
+  String get bluetoothScan => 'Zoeken';
+
+  @override
+  String get bluetoothStop => 'Stoppen';
+
+  @override
+  String get bluetoothNotSupported => 'Dit apparaat ondersteunt geen BLE';
+
+  @override
+  String get bluetoothScanError => 'Fout bij zoeken';
+
+  @override
+  String get bluetoothStopError => 'Fout bij stoppen';
+
+  @override
+  String get bluetoothStopped => 'Zoeken gestopt';
+
+  @override
+  String bluetoothConnecting(Object deviceName) {
+    return 'Verbinding maken met $deviceName...';
+  }
+
+  @override
+  String get bluetoothMissingCharacteristics =>
+      'Verbonden, maar vereiste kenmerken zijn niet gevonden';
+
+  @override
+  String get bluetoothConnectionError => 'Verbindingsfout';
+
+  @override
+  String get bluetoothConnectionLost => 'Bluetooth-verbinding verbroken';
+
+  @override
+  String get bluetoothTurnOnRequired => 'Bluetooth moet ingeschakeld zijn';
+
+  @override
+  String get bluetoothReconnecting => 'Opnieuw verbinden...';
 }

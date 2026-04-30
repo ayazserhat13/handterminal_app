@@ -147,4 +147,61 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get homeConnectHint => 'Please connect to the device via Bluetooth.';
+
+  @override
+  String get bluetoothTitle => 'Bluetooth Connection';
+
+  @override
+  String get bluetoothReady => 'Ready';
+
+  @override
+  String get bluetoothScanning => 'Scanning for devices...';
+
+  @override
+  String get bluetoothScanComplete => 'Scan complete';
+
+  @override
+  String get bluetoothNoDevicesFound => 'No devices found';
+
+  @override
+  String get bluetoothUnknownDevice => 'Unknown Device';
+
+  @override
+  String get bluetoothScan => 'Scan';
+
+  @override
+  String get bluetoothStop => 'Stop';
+
+  @override
+  String get bluetoothNotSupported => 'This device does not support BLE';
+
+  @override
+  String get bluetoothScanError => 'Scan error';
+
+  @override
+  String get bluetoothStopError => 'Stop error';
+
+  @override
+  String get bluetoothStopped => 'Scan stopped';
+
+  @override
+  String bluetoothConnecting(Object deviceName) {
+    return 'Connecting to $deviceName...';
+  }
+
+  @override
+  String get bluetoothMissingCharacteristics =>
+      'Connected, but required characteristics were not found';
+
+  @override
+  String get bluetoothConnectionError => 'Connection error';
+
+  @override
+  String get bluetoothConnectionLost => 'Bluetooth connection lost';
+
+  @override
+  String get bluetoothTurnOnRequired => 'Bluetooth must be turned on';
+
+  @override
+  String get bluetoothReconnecting => 'Reconnecting...';
 }

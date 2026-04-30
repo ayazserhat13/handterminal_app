@@ -3,6 +3,9 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:handterminal_app/l10n/app_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'display_screen.dart';
 
 import 'bluetooth.dart';
 import 'graph_screen.dart';
@@ -15,25 +18,43 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const String _lastDeviceIdKey = 'last_connected_ble_device_id';
+  static const String _lastDeviceNameKey = 'last_connected_ble_device_name';
+ 
+  bool isReconnecting = false;
+  bool _isAutoReconnecting = false;
   bool isConnected = false;
+  
+  BluetoothDevice? connectedDevice;
+  String? connectedDeviceName;
+  BluetoothCharacteristic? writeCharacteristic;
+  BluetoothCharacteristic? notifyCharacteristic;
+
   bool _blink = true;
   Timer? _blinkTimer;
 
+  StreamSubscription<BluetoothConnectionState>? _connectionSub;
+
   @override
   void initState() {
-    super.initState();
+      super.initState();
 
-    _blinkTimer = Timer.periodic(const Duration(milliseconds: 750), (_) {
-      if (!mounted) return;
-      if (!isConnected) {
-        setState(() => _blink = !_blink);
-      }
-    });
+      _blinkTimer = Timer.periodic(const Duration(milliseconds: 750), (_) {
+        if (!mounted) return;
+        if (!isConnected) {
+          setState(() => _blink = !_blink);
+        }
+      });
+
+      Future.microtask(() {
+        _autoReconnect();
+      });
   }
 
   @override
   void dispose() {
     _blinkTimer?.cancel();
+    _connectionSub?.cancel();
     super.dispose();
   }
 
@@ -124,37 +145,195 @@ class _HomeScreenState extends State<HomeScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            isConnected ? '' : l10n.homeNotConnected,
-            style: const TextStyle(
-              color: Colors.black54,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          if (!isConnected) const SizedBox(height: 6),
-          if (!isConnected)
-            Text(
-              l10n.homeConnectHint,
-              textAlign: TextAlign.center,
+              isConnected
+                ? ''
+                : isReconnecting
+                    ? l10n.bluetoothReconnecting
+                    : l10n.homeNotConnected,
               style: const TextStyle(
-                color: Colors.black45,
-                fontSize: 13,
+                color: Colors.black54,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
-            ),
+          ),
         ],
       ),
     );
   }
 
-  void _openBluetooth() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const BluetoothScreen(),
-      ),
-    );
+  Future<void> _autoReconnect() async {
+      if (_isAutoReconnecting) return;
+      setState(() {
+          isReconnecting = true;
+      });
+      final prefs = await SharedPreferences.getInstance();
+      final lastDeviceId = prefs.getString(_lastDeviceIdKey);
+      final lastDeviceName = prefs.getString(_lastDeviceNameKey);
+
+      if (lastDeviceId == null) return;
+
+      _isAutoReconnecting = true;
+
+      try {
+        final supported = await FlutterBluePlus.isSupported;
+        if (!supported) return;
+
+        final adapterState = await FlutterBluePlus.adapterState
+            .where((state) => state != BluetoothAdapterState.unknown)
+            .first
+            .timeout(const Duration(seconds: 3));
+
+        if (adapterState != BluetoothAdapterState.on) return;
+
+        BluetoothDevice? foundDevice;
+
+        final scanSub = FlutterBluePlus.scanResults.listen((results) {
+          for (final result in results) {
+            if (result.device.remoteId.str == lastDeviceId) {
+              foundDevice = result.device;
+              break;
+            }
+          }
+        });
+
+        await FlutterBluePlus.startScan(timeout: const Duration(seconds: 6));
+        await Future.delayed(const Duration(seconds: 6));
+        await FlutterBluePlus.stopScan();
+        await scanSub.cancel();
+
+        if (foundDevice == null) return;
+
+        final device = foundDevice!;
+
+        try {
+          await device.connect(timeout: const Duration(seconds: 10));
+        } catch (_) {
+          // cihaz zaten bağlı olabilir
+        }
+
+        final services = await device.discoverServices();
+
+        BluetoothCharacteristic? writeChar;
+        BluetoothCharacteristic? notifyChar;
+
+        for (final service in services) {
+          for (final characteristic in service.characteristics) {
+            if (writeChar == null &&
+                (characteristic.properties.write ||
+                    characteristic.properties.writeWithoutResponse)) {
+              writeChar = characteristic;
+            }
+
+            if (notifyChar == null &&
+                (characteristic.properties.notify ||
+                    characteristic.properties.indicate)) {
+              notifyChar = characteristic;
+            }
+          }
+        }
+
+        if (writeChar == null || notifyChar == null) return;
+
+        await notifyChar.setNotifyValue(true);
+
+        if (!mounted) return;
+
+        setState(() {
+          connectedDevice = device;
+          connectedDeviceName = lastDeviceName;
+          writeCharacteristic = writeChar;
+          notifyCharacteristic = notifyChar;
+          isConnected = true;
+          _blink = false;
+        });
+
+        _listenConnectionState(device);
+      } catch (_) {
+        // Kullanıcı manuel bağlanabilir.
+      } finally {
+        _isAutoReconnecting = false;
+        
+        if (mounted) {
+            setState(() {
+                isReconnecting = false;
+            });
+        }
+      }
+  }
+  
+  Future<void> _openBluetooth() async {
+      final result = await Navigator.push<Map<String, dynamic>>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const BluetoothScreen(),
+        ),
+      );
+
+      if (result == null) return;
+
+      setState(() {
+        connectedDevice = result['device'] as BluetoothDevice?;
+        connectedDeviceName = result['deviceName'] as String?;
+        writeCharacteristic =
+            result['writeCharacteristic'] as BluetoothCharacteristic?;
+        notifyCharacteristic =
+            result['notifyCharacteristic'] as BluetoothCharacteristic?;
+
+        isConnected =
+            connectedDevice != null &&
+            writeCharacteristic != null &&
+            notifyCharacteristic != null;
+
+        _blink = false;
+      });
+      
+      final device = connectedDevice;
+        if (device != null) {
+          _listenConnectionState(device);
+
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(_lastDeviceIdKey, device.remoteId.str);
+
+          if (connectedDeviceName != null) {
+            await prefs.setString(_lastDeviceNameKey, connectedDeviceName!);
+          }
+      }
   }
 
+  void _listenConnectionState(BluetoothDevice device) {
+      _connectionSub?.cancel();
+
+      _connectionSub = device.connectionState.listen((state) {
+        if (!mounted) return;
+
+        if (state == BluetoothConnectionState.disconnected) {
+          final l10n = AppLocalizations.of(context)!;
+
+          setState(() {
+            isConnected = false;
+            connectedDevice = null;
+            connectedDeviceName = null;
+            writeCharacteristic = null;
+            notifyCharacteristic = null;
+            _blink = true;
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(l10n.bluetoothConnectionLost),
+              ),
+          );
+
+          Future.delayed(const Duration(seconds: 2), () {
+              if (!mounted) return;
+              if (!isConnected) {
+                _autoReconnect();
+              }
+          });
+        }
+      });
+  }
+  
   void _openGraph() {
     if (!isConnected) return;
 
@@ -167,11 +346,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openTerminalPlaceholder() {
-    if (!isConnected) return;
+      if (!isConnected ||
+          writeCharacteristic == null ||
+          notifyCharacteristic == null) {
+        return;
+      }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Terminal screen will be connected here.')),
-    );
+      Navigator.of(context).push(
+          PageRouteBuilder(
+            opaque: false,
+            barrierColor: Colors.black.withOpacity(0.35),
+            pageBuilder: (_, __, ___) => DisplayScreen(
+              writeCharacteristic: writeCharacteristic!,
+              notifyCharacteristic: notifyCharacteristic!,
+            ),
+          ),
+      );
   }
 
   void _disabledAction() {
@@ -916,8 +1106,8 @@ class _HomeDrawer extends StatelessWidget {
           children: [
             const SizedBox(height: 16),
             const Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: const _BFLogo(width: 170),
+              padding: EdgeInsets.symmetric(horizontal: 24),
+              child: _BFLogo(width: 170),
             ),
             const SizedBox(height: 18),
             _drawerItem(

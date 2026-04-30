@@ -61,5 +61,29 @@
   "homeDocuments": "Documenten",
   "homeAbout": "Info",
   "homeNotConnected": "Niet verbonden",
-  "homeConnectHint": "Maak verbinding met het apparaat via Bluetooth."
+  "homeConnectHint": "Maak verbinding met het apparaat via Bluetooth.",
+  
+  "bluetoothTitle": "Bluetooth-verbinding",
+  "bluetoothReady": "Gereed",
+  "bluetoothScanning": "Apparaten zoeken...",
+  "bluetoothScanComplete": "Zoeken voltooid",
+  "bluetoothNoDevicesFound": "Geen apparaten gevonden",
+  "bluetoothUnknownDevice": "Onbekend apparaat",
+  "bluetoothScan": "Zoeken",
+  "bluetoothStop": "Stoppen",
+  "bluetoothNotSupported": "Dit apparaat ondersteunt geen BLE",
+  "bluetoothScanError": "Fout bij zoeken",
+  "bluetoothStopError": "Fout bij stoppen",
+  "bluetoothStopped": "Zoeken gestopt",
+  "bluetoothConnecting": "Verbinding maken met {deviceName}...",
+  "@bluetoothConnecting": {
+    "placeholders": {
+      "deviceName": {}
+    }
+  },
+  "bluetoothMissingCharacteristics": "Verbonden, maar vereiste kenmerken zijn niet gevonden",
+  "bluetoothConnectionError": "Verbindingsfout",
+  "bluetoothConnectionLost": "Bluetooth-verbinding verbroken",
+  "bluetoothTurnOnRequired": "Bluetooth moet ingeschakeld zijn",
+  "bluetoothReconnecting": "Opnieuw verbinden..."
 }

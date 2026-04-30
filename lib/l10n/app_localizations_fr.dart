@@ -147,4 +147,62 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get homeConnectHint => 'Veuillez connecter l’appareil via Bluetooth.';
+
+  @override
+  String get bluetoothTitle => 'Connexion Bluetooth';
+
+  @override
+  String get bluetoothReady => 'Prêt';
+
+  @override
+  String get bluetoothScanning => 'Recherche d’appareils...';
+
+  @override
+  String get bluetoothScanComplete => 'Recherche terminée';
+
+  @override
+  String get bluetoothNoDevicesFound => 'Aucun appareil trouvé';
+
+  @override
+  String get bluetoothUnknownDevice => 'Appareil inconnu';
+
+  @override
+  String get bluetoothScan => 'Rechercher';
+
+  @override
+  String get bluetoothStop => 'Arrêter';
+
+  @override
+  String get bluetoothNotSupported =>
+      'Cet appareil ne prend pas en charge le BLE';
+
+  @override
+  String get bluetoothScanError => 'Erreur de recherche';
+
+  @override
+  String get bluetoothStopError => 'Erreur lors de l’arrêt';
+
+  @override
+  String get bluetoothStopped => 'Recherche arrêtée';
+
+  @override
+  String bluetoothConnecting(Object deviceName) {
+    return 'Connexion à $deviceName...';
+  }
+
+  @override
+  String get bluetoothMissingCharacteristics =>
+      'Connecté, mais les caractéristiques requises sont introuvables';
+
+  @override
+  String get bluetoothConnectionError => 'Erreur de connexion';
+
+  @override
+  String get bluetoothConnectionLost => 'Connexion Bluetooth perdue';
+
+  @override
+  String get bluetoothTurnOnRequired => 'Le Bluetooth doit être activé';
+
+  @override
+  String get bluetoothReconnecting => 'Reconnexion en cours...';
 }

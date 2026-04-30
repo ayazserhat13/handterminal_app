@@ -371,6 +371,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Please connect to the device via Bluetooth.'**
   String get homeConnectHint;
+
+  /// No description provided for @bluetoothTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth Connection'**
+  String get bluetoothTitle;
+
+  /// No description provided for @bluetoothReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready'**
+  String get bluetoothReady;
+
+  /// No description provided for @bluetoothScanning.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning for devices...'**
+  String get bluetoothScanning;
+
+  /// No description provided for @bluetoothScanComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan complete'**
+  String get bluetoothScanComplete;
+
+  /// No description provided for @bluetoothNoDevicesFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No devices found'**
+  String get bluetoothNoDevicesFound;
+
+  /// No description provided for @bluetoothUnknownDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown Device'**
+  String get bluetoothUnknownDevice;
+
+  /// No description provided for @bluetoothScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan'**
+  String get bluetoothScan;
+
+  /// No description provided for @bluetoothStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get bluetoothStop;
+
+  /// No description provided for @bluetoothNotSupported.
+  ///
+  /// In en, this message translates to:
+  /// **'This device does not support BLE'**
+  String get bluetoothNotSupported;
+
+  /// No description provided for @bluetoothScanError.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan error'**
+  String get bluetoothScanError;
+
+  /// No description provided for @bluetoothStopError.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop error'**
+  String get bluetoothStopError;
+
+  /// No description provided for @bluetoothStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan stopped'**
+  String get bluetoothStopped;
+
+  /// No description provided for @bluetoothConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting to {deviceName}...'**
+  String bluetoothConnecting(Object deviceName);
+
+  /// No description provided for @bluetoothMissingCharacteristics.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected, but required characteristics were not found'**
+  String get bluetoothMissingCharacteristics;
+
+  /// No description provided for @bluetoothConnectionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection error'**
+  String get bluetoothConnectionError;
+
+  /// No description provided for @bluetoothConnectionLost.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth connection lost'**
+  String get bluetoothConnectionLost;
+
+  /// No description provided for @bluetoothTurnOnRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth must be turned on'**
+  String get bluetoothTurnOnRequired;
+
+  /// No description provided for @bluetoothReconnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnecting...'**
+  String get bluetoothReconnecting;
 }
 
 class _AppLocalizationsDelegate

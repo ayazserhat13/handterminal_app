@@ -61,5 +61,29 @@
   "homeDocuments": "Documents",
   "homeAbout": "About",
   "homeNotConnected": "Not connected",
-  "homeConnectHint": "Please connect to the device via Bluetooth."
+  "homeConnectHint": "Please connect to the device via Bluetooth.",
+  
+  "bluetoothTitle": "Bluetooth Connection",
+  "bluetoothReady": "Ready",
+  "bluetoothScanning": "Scanning for devices...",
+  "bluetoothScanComplete": "Scan complete",
+  "bluetoothNoDevicesFound": "No devices found",
+  "bluetoothUnknownDevice": "Unknown Device",
+  "bluetoothScan": "Scan",
+  "bluetoothStop": "Stop",
+  "bluetoothNotSupported": "This device does not support BLE",
+  "bluetoothScanError": "Scan error",
+  "bluetoothStopError": "Stop error",
+  "bluetoothStopped": "Scan stopped",
+  "bluetoothConnecting": "Connecting to {deviceName}...",
+  "@bluetoothConnecting": {
+    "placeholders": {
+      "deviceName": {}
+    }
+  },
+  "bluetoothMissingCharacteristics": "Connected, but required characteristics were not found",
+  "bluetoothConnectionError": "Connection error",
+  "bluetoothConnectionLost": "Bluetooth connection lost",
+  "bluetoothTurnOnRequired": "Bluetooth must be turned on",
+  "bluetoothReconnecting": "Reconnecting..."
 }

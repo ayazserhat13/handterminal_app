@@ -61,5 +61,29 @@
   "homeDocuments": "Documents",
   "homeAbout": "À propos",
   "homeNotConnected": "Non connecté",
-  "homeConnectHint": "Veuillez connecter l’appareil via Bluetooth."
+  "homeConnectHint": "Veuillez connecter l’appareil via Bluetooth.",
+  
+  "bluetoothTitle": "Connexion Bluetooth",
+  "bluetoothReady": "Prêt",
+  "bluetoothScanning": "Recherche d’appareils...",
+  "bluetoothScanComplete": "Recherche terminée",
+  "bluetoothNoDevicesFound": "Aucun appareil trouvé",
+  "bluetoothUnknownDevice": "Appareil inconnu",
+  "bluetoothScan": "Rechercher",
+  "bluetoothStop": "Arrêter",
+  "bluetoothNotSupported": "Cet appareil ne prend pas en charge le BLE",
+  "bluetoothScanError": "Erreur de recherche",
+  "bluetoothStopError": "Erreur lors de l’arrêt",
+  "bluetoothStopped": "Recherche arrêtée",
+  "bluetoothConnecting": "Connexion à {deviceName}...",
+  "@bluetoothConnecting": {
+    "placeholders": {
+      "deviceName": {}
+    }
+  },
+  "bluetoothMissingCharacteristics": "Connecté, mais les caractéristiques requises sont introuvables",
+  "bluetoothConnectionError": "Erreur de connexion",
+  "bluetoothConnectionLost": "Connexion Bluetooth perdue",
+  "bluetoothTurnOnRequired": "Le Bluetooth doit être activé",
+  "bluetoothReconnecting": "Reconnexion en cours..."
 }
