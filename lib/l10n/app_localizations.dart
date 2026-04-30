@@ -305,6 +305,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Terminal start error: {error}'**
   String statusTerminalStartError(Object error);
+
+  /// No description provided for @homeConnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect'**
+  String get homeConnect;
+
+  /// No description provided for @homeTerminal.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal'**
+  String get homeTerminal;
+
+  /// No description provided for @homeSpeedCurve.
+  ///
+  /// In en, this message translates to:
+  /// **'Speed Curve'**
+  String get homeSpeedCurve;
+
+  /// No description provided for @homeSoftwareUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Software Update'**
+  String get homeSoftwareUpdate;
+
+  /// No description provided for @homeDownloadErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Download Errors'**
+  String get homeDownloadErrors;
+
+  /// No description provided for @homeDownloadParameters.
+  ///
+  /// In en, this message translates to:
+  /// **'Download Parameters'**
+  String get homeDownloadParameters;
+
+  /// No description provided for @homeUploadParameters.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload Parameters'**
+  String get homeUploadParameters;
+
+  /// No description provided for @homeDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents'**
+  String get homeDocuments;
+
+  /// No description provided for @homeAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get homeAbout;
+
+  /// No description provided for @homeNotConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Not connected'**
+  String get homeNotConnected;
+
+  /// No description provided for @homeConnectHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Please connect to the device via Bluetooth.'**
+  String get homeConnectHint;
 }
 
 class _AppLocalizationsDelegate

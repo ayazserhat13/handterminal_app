@@ -115,4 +115,38 @@ class AppLocalizationsDe extends AppLocalizations {
   String statusTerminalStartError(Object error) {
     return 'Fehler beim Starten des Terminals: $error';
   }
+
+  @override
+  String get homeConnect => 'Verbinden';
+
+  @override
+  String get homeTerminal => 'Terminal';
+
+  @override
+  String get homeSpeedCurve => 'Fahrkurve';
+
+  @override
+  String get homeSoftwareUpdate => 'SW-Update';
+
+  @override
+  String get homeDownloadErrors => 'Fehler Liste';
+
+  @override
+  String get homeDownloadParameters => 'Parameter Speichern';
+
+  @override
+  String get homeUploadParameters => 'Parameter Laden';
+
+  @override
+  String get homeDocuments => 'Dokumente';
+
+  @override
+  String get homeAbout => 'Info';
+
+  @override
+  String get homeNotConnected => 'Nicht verbunden';
+
+  @override
+  String get homeConnectHint =>
+      'Bitte verbinden Sie sich per Bluetooth mit dem Gerät.';
 }

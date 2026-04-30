@@ -49,5 +49,17 @@
     "placeholders": {
       "error": {}
     }
-  }
+  },
+  
+  "homeConnect": "Verbinden",
+  "homeTerminal": "Terminal",
+  "homeSpeedCurve": "Snelheidscurve",
+  "homeSoftwareUpdate": "Software-update",
+  "homeDownloadErrors": "Fouten downloaden",
+  "homeDownloadParameters": "Parameters downloaden",
+  "homeUploadParameters": "Parameters uploaden",
+  "homeDocuments": "Documenten",
+  "homeAbout": "Info",
+  "homeNotConnected": "Niet verbonden",
+  "homeConnectHint": "Maak verbinding met het apparaat via Bluetooth."
 }

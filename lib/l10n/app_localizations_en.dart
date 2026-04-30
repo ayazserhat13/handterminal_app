@@ -114,4 +114,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String statusTerminalStartError(Object error) {
     return 'Terminal start error: $error';
   }
+
+  @override
+  String get homeConnect => 'Connect';
+
+  @override
+  String get homeTerminal => 'Terminal';
+
+  @override
+  String get homeSpeedCurve => 'Speed Curve';
+
+  @override
+  String get homeSoftwareUpdate => 'Software Update';
+
+  @override
+  String get homeDownloadErrors => 'Download Errors';
+
+  @override
+  String get homeDownloadParameters => 'Download Parameters';
+
+  @override
+  String get homeUploadParameters => 'Upload Parameters';
+
+  @override
+  String get homeDocuments => 'Documents';
+
+  @override
+  String get homeAbout => 'About';
+
+  @override
+  String get homeNotConnected => 'Not connected';
+
+  @override
+  String get homeConnectHint => 'Please connect to the device via Bluetooth.';
 }

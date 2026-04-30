@@ -115,4 +115,38 @@ class AppLocalizationsNl extends AppLocalizations {
   String statusTerminalStartError(Object error) {
     return 'Fout bij starten van terminal: $error';
   }
+
+  @override
+  String get homeConnect => 'Verbinden';
+
+  @override
+  String get homeTerminal => 'Terminal';
+
+  @override
+  String get homeSpeedCurve => 'Snelheidscurve';
+
+  @override
+  String get homeSoftwareUpdate => 'Software-update';
+
+  @override
+  String get homeDownloadErrors => 'Fouten downloaden';
+
+  @override
+  String get homeDownloadParameters => 'Parameters downloaden';
+
+  @override
+  String get homeUploadParameters => 'Parameters uploaden';
+
+  @override
+  String get homeDocuments => 'Documenten';
+
+  @override
+  String get homeAbout => 'Info';
+
+  @override
+  String get homeNotConnected => 'Niet verbonden';
+
+  @override
+  String get homeConnectHint =>
+      'Maak verbinding met het apparaat via Bluetooth.';
 }

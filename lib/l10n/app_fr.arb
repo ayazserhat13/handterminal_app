@@ -49,5 +49,17 @@
     "placeholders": {
       "error": {}
     }
-  }
+  },
+  
+  "homeConnect": "Connexion",
+  "homeTerminal": "Terminal",
+  "homeSpeedCurve": "Courbe de vitesse",
+  "homeSoftwareUpdate": "Mise à jour logicielle",
+  "homeDownloadErrors": "Télécharger les erreurs",
+  "homeDownloadParameters": "Télécharger les paramètres",
+  "homeUploadParameters": "Téléverser les paramètres",
+  "homeDocuments": "Documents",
+  "homeAbout": "À propos",
+  "homeNotConnected": "Non connecté",
+  "homeConnectHint": "Veuillez connecter l’appareil via Bluetooth."
 }

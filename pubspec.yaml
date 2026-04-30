@@ -34,6 +34,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icon/app_icon.png
+    - assets/logo/bf_logo.png
     
 # 👇 SPLASH CONFIG
 flutter_native_splash:

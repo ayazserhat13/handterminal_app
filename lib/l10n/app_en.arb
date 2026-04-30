@@ -49,5 +49,17 @@
     "placeholders": {
       "error": {}
     }
-  }
+  },
+  
+  "homeConnect": "Connect",
+  "homeTerminal": "Terminal",
+  "homeSpeedCurve": "Speed Curve",
+  "homeSoftwareUpdate": "Software Update",
+  "homeDownloadErrors": "Download Errors",
+  "homeDownloadParameters": "Download Parameters",
+  "homeUploadParameters": "Upload Parameters",
+  "homeDocuments": "Documents",
+  "homeAbout": "About",
+  "homeNotConnected": "Not connected",
+  "homeConnectHint": "Please connect to the device via Bluetooth."
 }
