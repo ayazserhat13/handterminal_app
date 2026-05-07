@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:handterminal_app/core/ble/ble_characteristic_resolver.dart';
 import 'package:handterminal_app/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
@@ -20,11 +21,11 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   static const String _lastDeviceIdKey = 'last_connected_ble_device_id';
   static const String _lastDeviceNameKey = 'last_connected_ble_device_name';
- 
+
   bool isReconnecting = false;
   bool _isAutoReconnecting = false;
   bool isConnected = false;
-  
+
   BluetoothDevice? connectedDevice;
   String? connectedDeviceName;
   BluetoothCharacteristic? writeCharacteristic;
@@ -34,21 +35,23 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _blinkTimer;
 
   StreamSubscription<BluetoothConnectionState>? _connectionSub;
+  final BleCharacteristicResolver _characteristicResolver =
+      const BleCharacteristicResolver();
 
   @override
   void initState() {
-      super.initState();
+    super.initState();
 
-      _blinkTimer = Timer.periodic(const Duration(milliseconds: 750), (_) {
-        if (!mounted) return;
-        if (!isConnected) {
-          setState(() => _blink = !_blink);
-        }
-      });
+    _blinkTimer = Timer.periodic(const Duration(milliseconds: 750), (_) {
+      if (!mounted) return;
+      if (!isConnected) {
+        setState(() => _blink = !_blink);
+      }
+    });
 
-      Future.microtask(() {
-        _autoReconnect();
-      });
+    Future.microtask(() {
+      _autoReconnect();
+    });
   }
 
   @override
@@ -63,10 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      drawer: _HomeDrawer(
-        isConnected: isConnected,
-        onConnect: _openBluetooth,
-      ),
+      drawer: _HomeDrawer(isConnected: isConnected, onConnect: _openBluetooth),
       body: Stack(
         children: [
           const _AluminumBackground(),
@@ -74,7 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Stack(
               children: [
                 _topBar(context, l10n),
-                
+
                 Positioned.fill(
                   top: 90,
                   bottom: 125,
@@ -100,7 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
-                
+
                 _bottomStatus(l10n),
               ],
             ),
@@ -145,16 +145,16 @@ class _HomeScreenState extends State<HomeScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-              isConnected
+            isConnected
                 ? ''
                 : isReconnecting
-                    ? l10n.bluetoothReconnecting
-                    : l10n.homeNotConnected,
-              style: const TextStyle(
-                color: Colors.black54,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+                ? l10n.bluetoothReconnecting
+                : l10n.homeNotConnected,
+            style: const TextStyle(
+              color: Colors.black54,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -162,206 +162,183 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _autoReconnect() async {
-      if (_isAutoReconnecting) return;
-      setState(() {
-          isReconnecting = true;
-      });
+    if (_isAutoReconnecting) return;
+    _isAutoReconnecting = true;
+    setState(() {
+      isReconnecting = true;
+    });
+
+    try {
       final prefs = await SharedPreferences.getInstance();
       final lastDeviceId = prefs.getString(_lastDeviceIdKey);
       final lastDeviceName = prefs.getString(_lastDeviceNameKey);
 
       if (lastDeviceId == null) return;
 
-      _isAutoReconnecting = true;
+      final supported = await FlutterBluePlus.isSupported;
+      if (!supported) return;
+
+      final adapterState = await FlutterBluePlus.adapterState
+          .where((state) => state != BluetoothAdapterState.unknown)
+          .first
+          .timeout(const Duration(seconds: 3));
+
+      if (adapterState != BluetoothAdapterState.on) return;
+
+      BluetoothDevice? foundDevice;
+
+      final scanSub = FlutterBluePlus.scanResults.listen((results) {
+        for (final result in results) {
+          if (result.device.remoteId.str == lastDeviceId) {
+            foundDevice = result.device;
+            break;
+          }
+        }
+      });
+
+      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 6));
+      await Future.delayed(const Duration(seconds: 6));
+      await FlutterBluePlus.stopScan();
+      await scanSub.cancel();
+
+      if (foundDevice == null) return;
+
+      final device = foundDevice!;
 
       try {
-        final supported = await FlutterBluePlus.isSupported;
-        if (!supported) return;
-
-        final adapterState = await FlutterBluePlus.adapterState
-            .where((state) => state != BluetoothAdapterState.unknown)
-            .first
-            .timeout(const Duration(seconds: 3));
-
-        if (adapterState != BluetoothAdapterState.on) return;
-
-        BluetoothDevice? foundDevice;
-
-        final scanSub = FlutterBluePlus.scanResults.listen((results) {
-          for (final result in results) {
-            if (result.device.remoteId.str == lastDeviceId) {
-              foundDevice = result.device;
-              break;
-            }
-          }
-        });
-
-        await FlutterBluePlus.startScan(timeout: const Duration(seconds: 6));
-        await Future.delayed(const Duration(seconds: 6));
-        await FlutterBluePlus.stopScan();
-        await scanSub.cancel();
-
-        if (foundDevice == null) return;
-
-        final device = foundDevice!;
-
-        try {
-          await device.connect(timeout: const Duration(seconds: 10));
-        } catch (_) {
-          // cihaz zaten bağlı olabilir
-        }
-
-        final services = await device.discoverServices();
-
-        BluetoothCharacteristic? writeChar;
-        BluetoothCharacteristic? notifyChar;
-
-        for (final service in services) {
-          for (final characteristic in service.characteristics) {
-            if (writeChar == null &&
-                (characteristic.properties.write ||
-                    characteristic.properties.writeWithoutResponse)) {
-              writeChar = characteristic;
-            }
-
-            if (notifyChar == null &&
-                (characteristic.properties.notify ||
-                    characteristic.properties.indicate)) {
-              notifyChar = characteristic;
-            }
-          }
-        }
-
-        if (writeChar == null || notifyChar == null) return;
-
-        await notifyChar.setNotifyValue(true);
-
-        if (!mounted) return;
-
-        setState(() {
-          connectedDevice = device;
-          connectedDeviceName = lastDeviceName;
-          writeCharacteristic = writeChar;
-          notifyCharacteristic = notifyChar;
-          isConnected = true;
-          _blink = false;
-        });
-
-        _listenConnectionState(device);
+        await device.connect(timeout: const Duration(seconds: 10));
       } catch (_) {
-        // Kullanıcı manuel bağlanabilir.
-      } finally {
-        _isAutoReconnecting = false;
-        
-        if (mounted) {
-            setState(() {
-                isReconnecting = false;
-            });
-        }
+        // cihaz zaten bağlı olabilir
       }
-  }
-  
-  Future<void> _openBluetooth() async {
-      final result = await Navigator.push<Map<String, dynamic>>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const BluetoothScreen(),
-        ),
-      );
 
-      if (result == null) return;
+      final services = await device.discoverServices();
+
+      final characteristics = _characteristicResolver.resolve(services);
+
+      if (characteristics == null) return;
+
+      await characteristics.notifyCharacteristic.setNotifyValue(true);
+
+      if (!mounted) return;
 
       setState(() {
-        connectedDevice = result['device'] as BluetoothDevice?;
-        connectedDeviceName = result['deviceName'] as String?;
-        writeCharacteristic =
-            result['writeCharacteristic'] as BluetoothCharacteristic?;
-        notifyCharacteristic =
-            result['notifyCharacteristic'] as BluetoothCharacteristic?;
-
-        isConnected =
-            connectedDevice != null &&
-            writeCharacteristic != null &&
-            notifyCharacteristic != null;
-
+        connectedDevice = device;
+        connectedDeviceName = lastDeviceName;
+        writeCharacteristic = characteristics.writeCharacteristic;
+        notifyCharacteristic = characteristics.notifyCharacteristic;
+        isConnected = true;
         _blink = false;
       });
-      
-      final device = connectedDevice;
-        if (device != null) {
-          _listenConnectionState(device);
 
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString(_lastDeviceIdKey, device.remoteId.str);
+      _listenConnectionState(device);
+    } catch (_) {
+      // Kullanıcı manuel bağlanabilir.
+    } finally {
+      _isAutoReconnecting = false;
 
-          if (connectedDeviceName != null) {
-            await prefs.setString(_lastDeviceNameKey, connectedDeviceName!);
-          }
+      if (mounted) {
+        setState(() {
+          isReconnecting = false;
+        });
       }
+    }
+  }
+
+  Future<void> _openBluetooth() async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(builder: (_) => const BluetoothScreen()),
+    );
+
+    if (result == null) return;
+
+    setState(() {
+      connectedDevice = result['device'] as BluetoothDevice?;
+      connectedDeviceName = result['deviceName'] as String?;
+      writeCharacteristic =
+          result['writeCharacteristic'] as BluetoothCharacteristic?;
+      notifyCharacteristic =
+          result['notifyCharacteristic'] as BluetoothCharacteristic?;
+
+      isConnected =
+          connectedDevice != null &&
+          writeCharacteristic != null &&
+          notifyCharacteristic != null;
+
+      _blink = false;
+    });
+
+    final device = connectedDevice;
+    if (device != null) {
+      _listenConnectionState(device);
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_lastDeviceIdKey, device.remoteId.str);
+
+      if (connectedDeviceName != null) {
+        await prefs.setString(_lastDeviceNameKey, connectedDeviceName!);
+      }
+    }
   }
 
   void _listenConnectionState(BluetoothDevice device) {
-      _connectionSub?.cancel();
+    _connectionSub?.cancel();
 
-      _connectionSub = device.connectionState.listen((state) {
-        if (!mounted) return;
+    _connectionSub = device.connectionState.listen((state) {
+      if (!mounted) return;
 
-        if (state == BluetoothConnectionState.disconnected) {
-          final l10n = AppLocalizations.of(context)!;
+      if (state == BluetoothConnectionState.disconnected) {
+        final l10n = AppLocalizations.of(context)!;
 
-          setState(() {
-            isConnected = false;
-            connectedDevice = null;
-            connectedDeviceName = null;
-            writeCharacteristic = null;
-            notifyCharacteristic = null;
-            _blink = true;
-          });
+        setState(() {
+          isConnected = false;
+          connectedDevice = null;
+          connectedDeviceName = null;
+          writeCharacteristic = null;
+          notifyCharacteristic = null;
+          _blink = true;
+        });
 
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(l10n.bluetoothConnectionLost),
-              ),
-          );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.bluetoothConnectionLost)));
 
-          Future.delayed(const Duration(seconds: 2), () {
-              if (!mounted) return;
-              if (!isConnected) {
-                _autoReconnect();
-              }
-          });
-        }
-      });
+        Future.delayed(const Duration(seconds: 2), () {
+          if (!mounted) return;
+          if (!isConnected) {
+            _autoReconnect();
+          }
+        });
+      }
+    });
   }
-  
+
   void _openGraph() {
     if (!isConnected) return;
 
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const GraphScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const GraphScreen()),
     );
   }
 
   void _openTerminalPlaceholder() {
-      if (!isConnected ||
-          writeCharacteristic == null ||
-          notifyCharacteristic == null) {
-        return;
-      }
+    if (!isConnected ||
+        writeCharacteristic == null ||
+        notifyCharacteristic == null) {
+      return;
+    }
 
-      Navigator.of(context).push(
-          PageRouteBuilder(
-            opaque: false,
-            barrierColor: Colors.black.withOpacity(0.35),
-            pageBuilder: (_, __, ___) => DisplayScreen(
-              writeCharacteristic: writeCharacteristic!,
-              notifyCharacteristic: notifyCharacteristic!,
-            ),
-          ),
-      );
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black.withOpacity(0.35),
+        pageBuilder: (_, __, ___) => DisplayScreen(
+          writeCharacteristic: writeCharacteristic!,
+          notifyCharacteristic: notifyCharacteristic!,
+        ),
+      ),
+    );
   }
 
   void _disabledAction() {
@@ -369,15 +346,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _documentsAction() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Documents')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Documents')));
   }
 
   void _aboutAction() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('About')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('About')));
   }
 }
 
@@ -415,11 +392,7 @@ class _BrushedMetalPainter extends CustomPainter {
       ..strokeWidth = 0.7;
 
     for (double y = 0; y < size.height; y += 4) {
-      canvas.drawLine(
-        Offset(0, y),
-        Offset(size.width, y + 1),
-        paint,
-      );
+      canvas.drawLine(Offset(0, y), Offset(size.width, y + 1), paint);
     }
   }
 
@@ -722,11 +695,7 @@ class _ModernHomeMenu extends StatelessWidget {
   }
 
   Widget _pos(double left, double top, Widget child) {
-    return Positioned(
-      left: left,
-      top: top,
-      child: child,
-    );
+    return Positioned(left: left, top: top, child: child);
   }
 }
 
@@ -894,14 +863,8 @@ class _RoundMenuButton extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: enabled
-                      ? [
-                          activeColor.withOpacity(0.95),
-                          const Color(0xFF063466),
-                        ]
-                      : [
-                          inactiveColor,
-                          inactiveColor.withOpacity(0.55),
-                        ],
+                      ? [activeColor.withOpacity(0.95), const Color(0xFF063466)]
+                      : [inactiveColor, inactiveColor.withOpacity(0.55)],
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -978,10 +941,7 @@ class _ModernMenuButton extends StatelessWidget {
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFFFFFFFF),
-                Color(0xFFE7ECEF),
-              ],
+              colors: [Color(0xFFFFFFFF), Color(0xFFE7ECEF)],
             ),
             boxShadow: [
               BoxShadow(
@@ -1038,10 +998,7 @@ class _FlowLine extends StatelessWidget {
   final double top;
   final bool reverse;
 
-  const _FlowLine({
-    required this.top,
-    this.reverse = false,
-  });
+  const _FlowLine({required this.top, this.reverse = false});
 
   @override
   Widget build(BuildContext context) {
@@ -1090,10 +1047,7 @@ class _HomeDrawer extends StatelessWidget {
   final bool isConnected;
   final VoidCallback onConnect;
 
-  const _HomeDrawer({
-    required this.isConnected,
-    required this.onConnect,
-  });
+  const _HomeDrawer({required this.isConnected, required this.onConnect});
 
   @override
   Widget build(BuildContext context) {
