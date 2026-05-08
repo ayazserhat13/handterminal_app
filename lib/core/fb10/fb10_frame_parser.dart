@@ -24,11 +24,6 @@ class Fb10FrameParser {
     if (bytes.isEmpty) return const <Fb10DisplayFrame>[];
 
     for (final byte in bytes) {
-      if (_isProtocolControlByte(byte)) {
-        _debugLog('dropped control byte ${_formatByte(byte)}');
-        continue;
-      }
-
       _buffer.add(byte);
     }
 
@@ -38,24 +33,53 @@ class Fb10FrameParser {
   }
 
   List<Fb10DisplayFrame> _consumeFrames() {
-    final frames = <Fb10DisplayFrame>[];
+      final frames = <Fb10DisplayFrame>[];
+      final frameLength = Fb10DisplayFrame.frameByteCount;
 
-    while (_buffer.length >= Fb10DisplayFrame.frameByteCount) {
-      final frame = _buffer.sublist(0, Fb10DisplayFrame.frameByteCount);
-      _buffer.removeRange(0, Fb10DisplayFrame.frameByteCount);
+      while (_buffer.length >= frameLength) {
+        var frameStart = -1;
 
-      _debugFrame(frame);
+        for (var i = 0; i <= _buffer.length - frameLength; i++) {
+          final candidate = _buffer.sublist(i, i + frameLength);
 
-      final parsedFrame = _parseFrame(frame);
-      if (parsedFrame != null) {
-        _debugLog('emitted frame length ${frame.length}');
-        frames.add(parsedFrame);
+          if (looksLikeValidFrame(candidate)) {
+            frameStart = i;
+            break;
+          }
+        }
+
+        if (frameStart < 0) {
+          final keepBytes = frameLength - 1;
+
+          if (_buffer.length > keepBytes) {
+            final dropCount = _buffer.length - keepBytes;
+            _debugLog('resync dropped $dropCount bytes without valid frame');
+            _buffer.removeRange(0, dropCount);
+          }
+
+          break;
+        }
+
+        if (frameStart > 0) {
+          _debugLog('resync skipped $frameStart bytes before valid frame');
+          _buffer.removeRange(0, frameStart);
+        }
+
+        final frame = _buffer.sublist(0, frameLength);
+        _buffer.removeRange(0, frameLength);
+
+        _debugFrame(frame);
+
+        final parsedFrame = _parseFrame(frame);
+        if (parsedFrame != null) {
+          _debugLog('emitted frame length ${frame.length}');
+          frames.add(parsedFrame);
+        }
+
+        _debugLog('buffer length ${_buffer.length}');
       }
 
-      _debugLog('buffer length ${_buffer.length}');
-    }
-
-    return frames;
+      return frames;
   }
 
   Fb10DisplayFrame? _parseFrame(List<int> data) {
@@ -101,10 +125,6 @@ class Fb10FrameParser {
 
   bool _isStatusByte(int byte) {
     return (byte & 0xF0) == 0x50;
-  }
-
-  bool _isProtocolControlByte(int byte) {
-    return byte == 0xBB || byte == 0xAA || byte == 0xAF;
   }
 
   bool _isPrintableOrExtended(int byte) {

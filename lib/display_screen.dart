@@ -26,41 +26,17 @@ class DisplayScreen extends StatefulWidget {
 class _DisplayScreenState extends State<DisplayScreen> {
   static const bool _verboseTrafficLogging = false;
   static const Duration _statsLogInterval = Duration(seconds: 1);
+  static const Duration _displayStartPollInterval = Duration(milliseconds: 250);
 
-  int? _heldKeyValue;
-  bool _heldKeyActive = false;
+  final Set<int> _pressedKeys = <int>{};
+  final Set<int> _latchedKeys = <int>{};
 
-  Timer? _idlePollTimer;
+  Timer? _displayStartTimer;
   Timer? _statsTimer;
-  DateTime _lastKeySentAt = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime? _lastFrameAt;
   DateTime? _lastPollAt;
   DateTime? _lastRxAt;
   DateTime? _lastStatsAt;
-
-  bool _keySequenceInProgress = false;
-
-  void _startLongPress(int key) async {
-    if (_heldKeyActive) return;
-
-    _heldKeyActive = true;
-    _heldKeyValue = key;
-
-    _suppressSingleByteEcho = true;
-
-    await _writeBytes([key]);
-  }
-
-  void _stopLongPress() async {
-    if (!_heldKeyActive) return;
-
-    _heldKeyActive = false;
-    _heldKeyValue = null;
-
-    await _writeBytes(const [Fb10Commands.idle]);
-
-    _lastKeySentAt = DateTime.now();
-  }
 
   List<String> lines = const [
     '                ',
@@ -86,16 +62,20 @@ class _DisplayScreenState extends State<DisplayScreen> {
   int _handshakeTryCount = 0;
 
   bool _waitingForFirstBb = false;
-  bool _waitingForSecondBb = false;
   bool _terminalStarted = false;
+  bool _firstFrameReceived = false;
   bool _busySending = false;
 
-  bool _suppressSingleByteEcho = false;
+  //bool _suppressSingleByteEcho = false;
 
   int _rxChunks = 0;
   int _rxBytes = 0;
   int _framesEmitted = 0;
+  int _singleByteEchoIgnored = 0;
+  int _singleByteFedToParserWhilePartial = 0;
+  int _displayStartPolls = 0;
   int _txPolls = 0;
+  int _keyTxCount = 0;
   int _pollIntervalCount = 0;
   int _pollIntervalTotalMs = 0;
   int? _pollIntervalMinMs;
@@ -127,7 +107,7 @@ class _DisplayScreenState extends State<DisplayScreen> {
 
   @override
   void dispose() {
-    _idlePollTimer?.cancel();
+    _displayStartTimer?.cancel();
     _statsTimer?.cancel();
     _notifyStreamSub?.cancel();
     _handshakeTimer?.cancel();
@@ -164,7 +144,12 @@ class _DisplayScreenState extends State<DisplayScreen> {
     final rxChunks = _rxChunks;
     final rxBytes = _rxBytes;
     final framesEmitted = _framesEmitted;
+    final singleByteEchoIgnored = _singleByteEchoIgnored;
+    final singleByteFedToParserWhilePartial =
+        _singleByteFedToParserWhilePartial;
+    final displayStartPolls = _displayStartPolls;
     final txPolls = _txPolls;
+    final keyTxCount = _keyTxCount;
     final pollIntervalCount = _pollIntervalCount;
     final pollIntervalMinMs = _pollIntervalMinMs;
     final pollIntervalAvgMs = pollIntervalCount == 0
@@ -197,7 +182,11 @@ class _DisplayScreenState extends State<DisplayScreen> {
     _rxChunks = 0;
     _rxBytes = 0;
     _framesEmitted = 0;
+    _singleByteEchoIgnored = 0;
+    _singleByteFedToParserWhilePartial = 0;
+    _displayStartPolls = 0;
     _txPolls = 0;
+    _keyTxCount = 0;
     _pollIntervalCount = 0;
     _pollIntervalTotalMs = 0;
     _pollIntervalMinMs = null;
@@ -210,7 +199,11 @@ class _DisplayScreenState extends State<DisplayScreen> {
     if (rxChunks == 0 &&
         rxBytes == 0 &&
         framesEmitted == 0 &&
+        singleByteEchoIgnored == 0 &&
+        singleByteFedToParserWhilePartial == 0 &&
+        displayStartPolls == 0 &&
         txPolls == 0 &&
+        keyTxCount == 0 &&
         pollIntervalCount == 0 &&
         writeDurationCount == 0) {
       return;
@@ -218,14 +211,17 @@ class _DisplayScreenState extends State<DisplayScreen> {
 
     _log(
       'STATS rxChunks=$rxChunks rxBytes=$rxBytes '
-      'framesEmitted=$framesEmitted txPolls=$txPolls '
+      'framesEmitted=$framesEmitted txPolls=$txPolls keyTxCount=$keyTxCount '
+      'displayStartPolls=$displayStartPolls '
+      'singleByteEchoIgnored=$singleByteEchoIgnored '
+      'singleByteFedToParserWhilePartial=$singleByteFedToParserWhilePartial '
       'framesPerSecond=${framesPerSecond.toStringAsFixed(1)} '
       'pollIntervalMs=${_formatTimingStats(pollIntervalMinMs, pollIntervalAvgMs, pollIntervalMaxMs)} '
       'writeDurationMs=${_formatTimingStats(writeDurationMinMs, writeDurationAvgMs, writeDurationMaxMs)} '
       'parserBufferLength=${_frameParser.bufferedByteCount} '
       'lastRxAgeMs=${lastRxAgeMs ?? -1} '
       'lastFrameAgeMs=${lastFrameAgeMs ?? -1} '
-      'pollTimerActive=${_idlePollTimer?.isActive == true} '
+      'displayStartTimerActive=${_displayStartTimer?.isActive == true} '
       'lastPollAgeMs=${lastPollAgeMs ?? -1}',
     );
   }
@@ -299,32 +295,78 @@ class _DisplayScreenState extends State<DisplayScreen> {
     _logTrafficBytes('TX', bytes);
   }
 
-  Future<void> _sendIdlePoll() async {
-    if (_heldKeyActive) return;
+  int _combinedKeyByte() {
+    var value = 0;
+    for (final key in _pressedKeys) {
+      value |= key;
+    }
+    for (final key in _latchedKeys) {
+      value |= key;
+    }
+    return value;
+  }
 
+  void _pressKey(int keyByte) {
+    _pressedKeys.add(keyByte);
+    _latchedKeys.add(keyByte);
+  }
+
+  void _releaseKey(int keyByte) {
+    _pressedKeys.remove(keyByte);
+  }
+
+  Future<void> _sendScheduledTx() async {
     if (sessionState != DisplaySessionState.terminalReady) return;
-    if (_keySequenceInProgress) return;
-    if (_writeQueue.isBusy) return;
 
-    //final now = DateTime.now();
-
-    // Tuştan hemen sonra idle poll gönderme
-    //if (now.difference(_lastKeySentAt) < Fb10Timings.idleAfterKeyGuard) {
-    //  return;
-    //}
+    final hasKeysToSend = _pressedKeys.isNotEmpty || _latchedKeys.isNotEmpty;
+    final byteToSend = hasKeysToSend ? _combinedKeyByte() : Fb10Commands.idle;
 
     try {
-      _suppressSingleByteEcho = true;
-      await _writeBytes(const [Fb10Commands.idle]);
-      _recordPollSent(DateTime.now());
-      _txPolls++;
+     // _suppressSingleByteEcho = true;
+      await _writeQueue.enqueue([byteToSend]);
+
+      if (byteToSend == Fb10Commands.idle) {
+        _recordPollSent(DateTime.now());
+        _txPolls++;
+      } else {
+        _keyTxCount++;
+        _latchedKeys.removeWhere((key) => !_pressedKeys.contains(key));
+      }
     } catch (e) {
-      _log('IDLE POLL ERROR: $e');
+      _log('SCHEDULED TX ERROR: $e');
     }
   }
 
+  Future<void> _sendDisplayStartPoll() async {
+    if (sessionState != DisplaySessionState.terminalReady) return;
+    if (!_terminalStarted) return;
+    if (_firstFrameReceived) return;
+    if (_writeQueue.isBusy) return;
+
+    try {
+      //_suppressSingleByteEcho = true;
+      await _writeBytes(const [Fb10Commands.startTerminal]);
+      _displayStartPolls++;
+    } catch (e) {
+      _log('DISPLAY START POLL ERROR: $e');
+    }
+  }
+
+  void _startDisplayStartPolling() {
+    _displayStartTimer?.cancel();
+    _displayStartTimer = Timer.periodic(_displayStartPollInterval, (_) {
+      _sendDisplayStartPoll();
+    });
+    _sendDisplayStartPoll();
+  }
+
+  void _stopDisplayStartPolling() {
+    _displayStartTimer?.cancel();
+    _displayStartTimer = null;
+  }
+
   void _listenNotify() {
-    _notifyStreamSub = widget.notifyCharacteristic.lastValueStream.listen((
+    _notifyStreamSub = widget.notifyCharacteristic.onValueReceived.listen((
       value,
     ) {
       if (value.isEmpty) return;
@@ -334,7 +376,7 @@ class _DisplayScreenState extends State<DisplayScreen> {
       _rxBytes += value.length;
       _logTrafficBytes('RX', value);
 
-      if (_waitingForFirstBb || _waitingForSecondBb) {
+      if (_waitingForFirstBb) {
         _handleHandshakeBytes(value);
         return;
       }
@@ -342,14 +384,19 @@ class _DisplayScreenState extends State<DisplayScreen> {
       if (!_terminalStarted) return;
 
       // Tek byte echo'ları yok say
-      if (value.length == 1 && _suppressSingleByteEcho) {
-        final b = value.first;
-        if ((b & 0xF0) == 0xA0 || Fb10Commands.singleByteEchoes.contains(b)) {
-          _log('Single-byte echo ignored: ${b.toRadixString(16)}');
-          _suppressSingleByteEcho = false;
-          return;
-        }
-      }
+      //if (value.length == 1 && _suppressSingleByteEcho) {
+      //    final b = value.first;
+      //    if ((b & 0xF0) == 0xA0 || //Fb10Commands.singleByteEchoes.contains(b)) {
+        //    if (_frameParser.bufferedByteCount > 0) {
+        //      _singleByteFedToParserWhilePartial++;
+        //      _suppressSingleByteEcho = false;
+        //    } else {
+         //     _singleByteEchoIgnored++;
+         //     _suppressSingleByteEcho = false;
+        //      return;
+       //     }
+      //    }
+     // }
 
       final frames = _frameParser.addBytes(value);
       _framesEmitted += frames.length;
@@ -360,83 +407,99 @@ class _DisplayScreenState extends State<DisplayScreen> {
   }
 
   Future<void> _startTerminalHandshake() async {
-    if (_busySending) return;
-    _busySending = true;
+      if (_busySending) return;
+      _busySending = true;
 
-    try {
-      setState(() {
-        sessionState = DisplaySessionState.handshaking;
-        statusText = AppLocalizations.of(context).statusHandshakeStarting;
-      });
+      try {
+        setState(() {
+          sessionState = DisplaySessionState.handshaking;
+          statusText = AppLocalizations.of(context).statusHandshakeStarting;
+        });
 
-      _frameParser.clear();
-      _waitingForFirstBb = true;
-      _waitingForSecondBb = false;
-      _terminalStarted = false;
-      _handshakeTryCount = 0;
+        _frameParser.clear();
+        _waitingForFirstBb = true;
+        _terminalStarted = false;
+        _firstFrameReceived = false;
+        _handshakeTryCount = 0;
 
-      _handshakeTimer?.cancel();
+        _stopDisplayStartPolling();
+        _handshakeTimer?.cancel();
 
-      _handshakeTimer = Timer.periodic(Fb10Timings.handshakeRetryInterval, (
-        timer,
-      ) async {
-        if (!_waitingForFirstBb) {
-          timer.cancel();
-          return;
-        }
+        var sendWakeNext = true;
 
-        _handshakeTryCount++;
-        _log('Handshake deneme: $_handshakeTryCount');
+        setState(() {
+          statusText = AppLocalizations.of(context).statusWaitingForBb;
+        });
 
-        if (_handshakeTryCount > 100) {
-          timer.cancel();
-          if (mounted) {
-            setState(() {
-              sessionState = DisplaySessionState.error;
-              statusText = AppLocalizations.of(context).statusBbTimeout;
-            });
-          }
-          return;
-        }
+        _handshakeTimer = Timer.periodic(
+          Fb10Timings.handshakeRetryInterval,
+          (timer) async {
+            if (!_waitingForFirstBb) {
+              timer.cancel();
+              return;
+            }
 
-        try {
-          if (_writeQueue.isBusy) return;
-          await _writeBytes(const [Fb10Commands.handshakeWake]);
-          await Future.delayed(Fb10Timings.handshakeCommandGap);
-          if (!_waitingForFirstBb) return;
-          await _writeBytes(const [Fb10Commands.handshakeRequest]);
-        } catch (e) {
-          _log('Handshake send error: $e');
-        }
-      });
+            _handshakeTryCount++;
+            _log('Handshake deneme: $_handshakeTryCount');
 
-      setState(() {
-        statusText = AppLocalizations.of(context).statusWaitingForBb;
-      });
-    } catch (e) {
-      setState(() {
-        sessionState = DisplaySessionState.error;
-        statusText = AppLocalizations.of(
-          context,
-        ).statusHandshakeError(e.toString());
-      });
-    } finally {
-      _busySending = false;
-    }
+            if (_handshakeTryCount > 100) {
+              timer.cancel();
+              if (mounted) {
+                setState(() {
+                  sessionState = DisplaySessionState.error;
+                  statusText = AppLocalizations.of(context).statusBbTimeout;
+                });
+              }
+              return;
+            }
+
+            try {
+              if (_writeQueue.isBusy) return;
+
+              final byteToSend = sendWakeNext
+                  ? Fb10Commands.handshakeWake
+                  : Fb10Commands.handshakeRequest;
+
+              sendWakeNext = !sendWakeNext;
+
+              await _writeBytes([byteToSend]);
+            } catch (e) {
+              _log('Handshake send error: $e');
+            }
+          },
+        );
+
+        await _writeBytes(const [Fb10Commands.handshakeWake]);
+      } catch (e) {
+        setState(() {
+          sessionState = DisplaySessionState.error;
+          statusText = AppLocalizations.of(
+            context,
+          ).statusHandshakeError(e.toString());
+        });
+      } finally {
+        _busySending = false;
+      }
   }
 
   void _handleHandshakeBytes(List<int> value) async {
-    final hasBb = value.contains(Fb10Commands.handshakeResponse);
+      _log(
+        'Handshake RX raw: ${value.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}',
+      );
 
-    if (_waitingForFirstBb) {
+      final hasBb = value.contains(Fb10Commands.handshakeResponse);
+
+      if (!_waitingForFirstBb) return;
+
       if (!hasBb) {
-        _log('Handshake stage 1: BB yok, veri yok sayıldı');
-        return;
+          _log('Handshake stage 1: BB yok, veri bekleniyor');
+          return;
       }
+
+      _log('Handshake stage 1: BB geldi, 0xAA gönderiliyor');
 
       _handshakeTimer?.cancel();
       _waitingForFirstBb = false;
-      _waitingForSecondBb = true;
       _writeQueue.clearPending();
 
       setState(() {
@@ -444,62 +507,38 @@ class _DisplayScreenState extends State<DisplayScreen> {
       });
 
       await _writeBytes(const [Fb10Commands.handshakeAck]);
-      return;
-    }
-
-    if (_waitingForSecondBb) {
-      if (!hasBb) {
-        _log('Handshake stage 2: BB yok, veri yok sayıldı');
-        return;
-      }
-
-      _waitingForSecondBb = false;
-      _writeQueue.clearPending();
-
-      setState(() {
-        statusText = AppLocalizations.of(context).statusSecondBbReceived;
-      });
-
       await _startTerminalMode();
-    }
   }
 
   Future<void> _startTerminalMode() async {
-    try {
-      _frameParser.clear();
-      await _writeBytes(const [Fb10Commands.startTerminal]);
-      _terminalStarted = true;
+      try {
+        _frameParser.clear();
+        _terminalStarted = true;
+        _firstFrameReceived = false;
+        //_suppressSingleByteEcho = true;
 
-      setState(() {
-        sessionState = DisplaySessionState.terminalReady;
-        statusText = AppLocalizations.of(context).statusTerminalReady;
-      });
+        setState(() {
+          sessionState = DisplaySessionState.terminalReady;
+          statusText = AppLocalizations.of(context).statusTerminalReady;
+        });
 
-      _startIdlePolling();
-
-      // İlk ekran için ilk idle poll
-      await Future.delayed(Fb10Timings.firstIdlePollDelay);
-      await _sendIdlePoll();
-    } catch (e) {
-      setState(() {
-        sessionState = DisplaySessionState.error;
-        statusText = AppLocalizations.of(
-          context,
-        ).statusTerminalStartError(e.toString());
-      });
-    }
-  }
-
-  void _startIdlePolling() {
-    _idlePollTimer?.cancel();
-
-    _idlePollTimer = Timer.periodic(Fb10Timings.idlePollInterval, (_) {
-      _sendIdlePoll();
-    });
+        _startDisplayStartPolling();
+      } catch (e) {
+        setState(() {
+          sessionState = DisplaySessionState.error;
+          statusText = AppLocalizations.of(
+            context,
+          ).statusTerminalStartError(e.toString());
+        });
+      }
   }
 
   void _applyDisplayFrame(Fb10DisplayFrame frame) {
     _lastFrameAt = DateTime.now();
+    if (!_firstFrameReceived) {
+      _firstFrameReceived = true;
+      _stopDisplayStartPolling();
+    }
 
     setState(() {
       lines = frame.lines;
@@ -509,57 +548,9 @@ class _DisplayScreenState extends State<DisplayScreen> {
     });
 
     // Frame geldi, artık yeni poll gönderebiliriz
-    _suppressSingleByteEcho = false;
-
-    if (_heldKeyActive && _heldKeyValue != null) {
-      Future.delayed(Fb10Timings.repeatKeyDelay, () async {
-        if (!mounted) return;
-        if (!_heldKeyActive) return;
-        if (_heldKeyValue == null) return;
-        if (_writeQueue.isBusy) return;
-
-        _suppressSingleByteEcho = true;
-        await _writeBytes([_heldKeyValue!]);
-      });
-    }
+    //_suppressSingleByteEcho = false;
+    _sendScheduledTx();
   }
-
-  Future<void> _sendKeyByte(int value) async {
-      if (sessionState != DisplaySessionState.terminalReady) return;
-      if (_keySequenceInProgress) return;
-
-      _keySequenceInProgress = true;
-
-      try {
-        _suppressSingleByteEcho = true;
-
-        await _writeBytes([value]);
-        await Future.delayed(Fb10Timings.keyPressDuration);
-        await _writeBytes(const [Fb10Commands.idle]);
-
-        _lastKeySentAt = DateTime.now();
-
-        // Kritik fark:
-        // keyReleaseGuard polling'i bloke etmesin
-      } catch (e) {
-        _log('KEY SEND ERROR: $e');
-        setState(() {
-          statusText = AppLocalizations.of(context).statusKeySendError;
-        });
-      } finally {
-        _suppressSingleByteEcho = false;
-        _keySequenceInProgress = false;
-      }
-  }
-
-  Future<void> _sendQuit() => _sendKeyByte(Fb10Commands.quit);
-  Future<void> _sendAb() => _sendKeyByte(Fb10Commands.down);
-  Future<void> _sendAuf() => _sendKeyByte(Fb10Commands.up);
-  Future<void> _sendEnter() => _sendKeyByte(Fb10Commands.enter);
-
-  Future<void> _sendMenu() => _sendKeyByte(Fb10Commands.menu);
-  Future<void> _sendMonitor() => _sendKeyByte(Fb10Commands.monitor);
-  Future<void> _sendErrors() => _sendKeyByte(Fb10Commands.errors);
 
   Widget _led(bool state, Color onColor) {
     return Container(
@@ -627,62 +618,78 @@ class _DisplayScreenState extends State<DisplayScreen> {
     );
   }
 
-  Widget _button(String text, VoidCallback onPressed) {
-    return SizedBox(
-      width: 76,
-      height: 44,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFE9ECEF),
-          foregroundColor: Colors.black,
-          elevation: 3,
-          padding: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-            side: const BorderSide(color: Colors.black54, width: 1),
+  Widget _keyPressListener({required int keyByte, required Widget child}) {
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (_) => _pressKey(keyByte),
+      onPointerUp: (_) => _releaseKey(keyByte),
+      onPointerCancel: (_) => _releaseKey(keyByte),
+      child: child,
+    );
+  }
+
+  Widget _button(String text, int keyByte) {
+    return _keyPressListener(
+      keyByte: keyByte,
+      child: SizedBox(
+        width: 76,
+        height: 44,
+        child: ElevatedButton(
+          onPressed: () {},
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFE9ECEF),
+            foregroundColor: Colors.black,
+            elevation: 3,
+            padding: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: Colors.black54, width: 1),
+            ),
+            textStyle: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
           ),
-          textStyle: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.2,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(text, maxLines: 1, softWrap: false),
           ),
-        ),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(text, maxLines: 1, softWrap: false),
         ),
       ),
     );
   }
 
-  Widget _roundPrimaryButton(String text, VoidCallback onPressed) {
+  Widget _roundPrimaryButton(String text, int keyByte) {
     const blue = Color(0xFF0A4C93);
 
-    return SizedBox(
-      width: 68,
-      height: 68,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: blue,
-          foregroundColor: Colors.white,
-          shape: const CircleBorder(),
-          elevation: 5,
-          shadowColor: blue.withValues(alpha: 0.35),
-          padding: const EdgeInsets.all(8),
-        ),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            text,
-            maxLines: 1,
-            softWrap: false,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.2,
+    return _keyPressListener(
+      keyByte: keyByte,
+      child: SizedBox(
+        width: 68,
+        height: 68,
+        child: ElevatedButton(
+          onPressed: () {},
+          style: ElevatedButton.styleFrom(
+            backgroundColor: blue,
+            foregroundColor: Colors.white,
+            shape: const CircleBorder(),
+            elevation: 5,
+            shadowColor: blue.withValues(alpha: 0.35),
+            padding: const EdgeInsets.all(8),
+          ),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              text,
+              maxLines: 1,
+              softWrap: false,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.2,
+              ),
             ),
           ),
         ),
@@ -819,30 +826,16 @@ class _DisplayScreenState extends State<DisplayScreen> {
                   ),
                   const SizedBox(height: 18),
                   _buttonRow([
-                    _button(l10n.menu, _sendMenu),
-                    _button(l10n.monitor, _sendMonitor),
-                    _button(l10n.errors, _sendErrors),
+                    _button(l10n.menu, Fb10Commands.menu),
+                    _button(l10n.monitor, Fb10Commands.monitor),
+                    _button(l10n.errors, Fb10Commands.errors),
                   ]),
                   const SizedBox(height: 10),
                   _buttonRow([
-                    _roundPrimaryButton(l10n.quit, _sendQuit),
-
-                    GestureDetector(
-                      onLongPressStart: (_) =>
-                          _startLongPress(Fb10Commands.down),
-                      onLongPressEnd: (_) => _stopLongPress(),
-                      onTap: _sendAb,
-                      child: _roundPrimaryButton(l10n.ab, _sendAb),
-                    ),
-
-                    GestureDetector(
-                      onLongPressStart: (_) => _startLongPress(Fb10Commands.up),
-                      onLongPressEnd: (_) => _stopLongPress(),
-                      onTap: _sendAuf,
-                      child: _roundPrimaryButton(l10n.auf, _sendAuf),
-                    ),
-
-                    _roundPrimaryButton(l10n.enter, _sendEnter),
+                    _roundPrimaryButton(l10n.quit, Fb10Commands.quit),
+                    _roundPrimaryButton(l10n.ab, Fb10Commands.down),
+                    _roundPrimaryButton(l10n.auf, Fb10Commands.up),
+                    _roundPrimaryButton(l10n.enter, Fb10Commands.enter),
                   ]),
                 ],
               ),
