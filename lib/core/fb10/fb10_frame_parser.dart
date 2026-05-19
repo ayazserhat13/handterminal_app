@@ -106,7 +106,7 @@ class Fb10FrameParser {
 
     if (!_isStatusByte(status)) return false;
 
-    if (_isStatusByte(frame.first)) return false;
+    //if (_isStatusByte(frame.first)) return false;
 
     final printableCount = frame
         .sublist(0, Fb10DisplayFrame.displayByteCount)
