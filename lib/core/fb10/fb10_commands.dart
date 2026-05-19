@@ -4,6 +4,7 @@ class Fb10Commands {
   static const int handshakeAck = 0xAA;
   static const int handshakeResponse = 0xBB;
   static const int startTerminal = 0x50;
+  static const int terminalExit = 0xCC;
   static const int idle = 0xAF;
 
   static const int menu = 0xA3;

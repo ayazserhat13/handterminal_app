@@ -7,7 +7,7 @@ import 'package:handterminal_app/core/fb10/fb10_frame_parser.dart';
 import 'package:handterminal_app/core/fb10/fb10_write_queue.dart';
 import 'package:handterminal_app/l10n/app_localizations.dart';
 
-enum DisplaySessionState { idle, handshaking, terminalReady, error }
+enum DisplaySessionState { idle, terminalReady, error }
 
 class DisplayScreen extends StatefulWidget {
   final BluetoothCharacteristic writeCharacteristic;
@@ -57,15 +57,15 @@ class _DisplayScreenState extends State<DisplayScreen> {
   );
   late final Fb10WriteQueue _writeQueue;
 
-  Timer? _handshakeTimer;
-
-  int _handshakeTryCount = 0;
-
-  bool _waitingForFirstBb = false;
   bool _terminalStarted = false;
   bool _firstFrameReceived = false;
-  bool _busySending = false;
-
+  bool _skipNextDisplayFrame = false;
+  bool _terminalExitSent = false;
+  bool _isClosing = false;
+  bool _allowPop = false;
+  bool _lastRxContainedBb = false;
+  bool _exitRequested = false;
+  Completer<void>? _exitCompleter;
   //bool _suppressSingleByteEcho = false;
 
   int _rxChunks = 0;
@@ -92,7 +92,7 @@ class _DisplayScreenState extends State<DisplayScreen> {
     _startStatsLogging();
     _listenNotify();
     Future.microtask(() async {
-      await _startTerminalHandshake();
+      await _startTerminalMode();
     });
   }
 
@@ -110,7 +110,6 @@ class _DisplayScreenState extends State<DisplayScreen> {
     _displayStartTimer?.cancel();
     _statsTimer?.cancel();
     _notifyStreamSub?.cancel();
-    _handshakeTimer?.cancel();
     _writeQueue.close();
     super.dispose();
   }
@@ -295,11 +294,83 @@ class _DisplayScreenState extends State<DisplayScreen> {
     _logTrafficBytes('TX', bytes);
   }
 
+  Future<void> _sendTerminalExit() async {
+      if (_terminalExitSent) return;
+
+      _terminalExitSent = true;
+      _stopDisplayStartPolling();
+      _pressedKeys.clear();
+      _latchedKeys.clear();
+      _writeQueue.clearPending();
+
+      try {
+        _log('sending terminal exit 0xCC');
+        await _writeBytes(const [Fb10Commands.terminalExit]);
+      } catch (e) {
+        _log('TERMINAL EXIT ERROR: $e');
+      } finally {
+        _terminalStarted = false;
+
+        final completer = _exitCompleter;
+        if (completer != null && !completer.isCompleted) {
+          completer.complete();
+        }
+      }
+  }
+
+  Future<void> _exitTerminalAndPop() async {
+      if (_isClosing) return;
+      _isClosing = true;
+
+      _exitRequested = true;
+      _pressedKeys.clear();
+      _latchedKeys.clear();
+
+      final completer = Completer<void>();
+      _exitCompleter = completer;
+
+      try {
+        await completer.future.timeout(
+          const Duration(milliseconds: 600),
+          onTimeout: () async {
+            _log('terminal exit timeout; sending 0xCC directly');
+            await _sendTerminalExit();
+          },
+        );
+      } catch (e) {
+        _log('TERMINAL EXIT WAIT ERROR: $e');
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _allowPop = true;
+      });
+
+      Navigator.of(context).pop();
+  }
+
   int _combinedKeyByte() {
     var value = 0;
     for (final key in _pressedKeys) {
       value |= key;
     }
+    for (final key in _latchedKeys) {
+      value |= key;
+    }
+    return value;
+  }
+
+  int _combinedPressedKeyByte() {
+    var value = 0;
+    for (final key in _pressedKeys) {
+      value |= key;
+    }
+    return value;
+  }
+
+  int _combinedLatchedKeyByte() {
+    var value = 0;
     for (final key in _latchedKeys) {
       value |= key;
     }
@@ -319,10 +390,15 @@ class _DisplayScreenState extends State<DisplayScreen> {
     if (sessionState != DisplaySessionState.terminalReady) return;
 
     final hasKeysToSend = _pressedKeys.isNotEmpty || _latchedKeys.isNotEmpty;
-    final byteToSend = hasKeysToSend ? _combinedKeyByte() : Fb10Commands.idle;
+
+    final byteToSend = _pressedKeys.isNotEmpty
+        ? _combinedPressedKeyByte()
+        : hasKeysToSend
+        ? _combinedLatchedKeyByte()
+        : Fb10Commands.idle;
 
     try {
-     // _suppressSingleByteEcho = true;
+      // _suppressSingleByteEcho = true;
       await _writeQueue.enqueue([byteToSend]);
 
       if (byteToSend == Fb10Commands.idle) {
@@ -370,16 +446,13 @@ class _DisplayScreenState extends State<DisplayScreen> {
       value,
     ) {
       if (value.isEmpty) return;
-
+      if (value.contains(Fb10Commands.handshakeResponse)) {
+          _lastRxContainedBb = true;
+      }
       _lastRxAt = DateTime.now();
       _rxChunks++;
       _rxBytes += value.length;
       _logTrafficBytes('RX', value);
-
-      if (_waitingForFirstBb) {
-        _handleHandshakeBytes(value);
-        return;
-      }
 
       if (!_terminalStarted) return;
 
@@ -387,16 +460,16 @@ class _DisplayScreenState extends State<DisplayScreen> {
       //if (value.length == 1 && _suppressSingleByteEcho) {
       //    final b = value.first;
       //    if ((b & 0xF0) == 0xA0 || //Fb10Commands.singleByteEchoes.contains(b)) {
-        //    if (_frameParser.bufferedByteCount > 0) {
-        //      _singleByteFedToParserWhilePartial++;
-        //      _suppressSingleByteEcho = false;
-        //    } else {
-         //     _singleByteEchoIgnored++;
-         //     _suppressSingleByteEcho = false;
-        //      return;
-       //     }
+      //    if (_frameParser.bufferedByteCount > 0) {
+      //      _singleByteFedToParserWhilePartial++;
+      //      _suppressSingleByteEcho = false;
+      //    } else {
+      //     _singleByteEchoIgnored++;
+      //     _suppressSingleByteEcho = false;
+      //      return;
+      //     }
       //    }
-     // }
+      // }
 
       final frames = _frameParser.addBytes(value);
       _framesEmitted += frames.length;
@@ -406,140 +479,52 @@ class _DisplayScreenState extends State<DisplayScreen> {
     });
   }
 
-  Future<void> _startTerminalHandshake() async {
-      if (_busySending) return;
-      _busySending = true;
-
-      try {
-        setState(() {
-          sessionState = DisplaySessionState.handshaking;
-          statusText = AppLocalizations.of(context).statusHandshakeStarting;
-        });
-
-        _frameParser.clear();
-        _waitingForFirstBb = true;
-        _terminalStarted = false;
-        _firstFrameReceived = false;
-        _handshakeTryCount = 0;
-
-        _stopDisplayStartPolling();
-        _handshakeTimer?.cancel();
-
-        var sendWakeNext = true;
-
-        setState(() {
-          statusText = AppLocalizations.of(context).statusWaitingForBb;
-        });
-
-        _handshakeTimer = Timer.periodic(
-          Fb10Timings.handshakeRetryInterval,
-          (timer) async {
-            if (!_waitingForFirstBb) {
-              timer.cancel();
-              return;
-            }
-
-            _handshakeTryCount++;
-            _log('Handshake deneme: $_handshakeTryCount');
-
-            if (_handshakeTryCount > 100) {
-              timer.cancel();
-              if (mounted) {
-                setState(() {
-                  sessionState = DisplaySessionState.error;
-                  statusText = AppLocalizations.of(context).statusBbTimeout;
-                });
-              }
-              return;
-            }
-
-            try {
-              if (_writeQueue.isBusy) return;
-
-              final byteToSend = sendWakeNext
-                  ? Fb10Commands.handshakeWake
-                  : Fb10Commands.handshakeRequest;
-
-              sendWakeNext = !sendWakeNext;
-
-              await _writeBytes([byteToSend]);
-            } catch (e) {
-              _log('Handshake send error: $e');
-            }
-          },
-        );
-
-        await _writeBytes(const [Fb10Commands.handshakeWake]);
-      } catch (e) {
-        setState(() {
-          sessionState = DisplaySessionState.error;
-          statusText = AppLocalizations.of(
-            context,
-          ).statusHandshakeError(e.toString());
-        });
-      } finally {
-        _busySending = false;
-      }
-  }
-
-  void _handleHandshakeBytes(List<int> value) async {
-      _log(
-        'Handshake RX raw: ${value.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}',
-      );
-
-      final hasBb = value.contains(Fb10Commands.handshakeResponse);
-
-      if (!_waitingForFirstBb) return;
-
-      if (!hasBb) {
-          _log('Handshake stage 1: BB yok, veri bekleniyor');
-          return;
-      }
-
-      _log('Handshake stage 1: BB geldi, 0xAA gönderiliyor');
-
-      _handshakeTimer?.cancel();
-      _waitingForFirstBb = false;
-      _writeQueue.clearPending();
+  Future<void> _startTerminalMode() async {
+    try {
+      _frameParser.clear();
+      _terminalStarted = true;
+      _firstFrameReceived = false;
+      _skipNextDisplayFrame = true;
+      //_suppressSingleByteEcho = true;
 
       setState(() {
-        statusText = AppLocalizations.of(context).statusFirstBbReceived;
+        sessionState = DisplaySessionState.terminalReady;
+        statusText = AppLocalizations.of(context).statusTerminalReady;
       });
 
-      await _writeBytes(const [Fb10Commands.handshakeAck]);
-      await _startTerminalMode();
-  }
+      await Future.delayed(const Duration(milliseconds: 80));
 
-  Future<void> _startTerminalMode() async {
-      try {
-        _frameParser.clear();
-        _terminalStarted = true;
-        _firstFrameReceived = false;
-        //_suppressSingleByteEcho = true;
-
-        setState(() {
-          sessionState = DisplaySessionState.terminalReady;
-          statusText = AppLocalizations.of(context).statusTerminalReady;
-        });
-
-        _startDisplayStartPolling();
-      } catch (e) {
-        setState(() {
-          sessionState = DisplaySessionState.error;
-          statusText = AppLocalizations.of(
-            context,
-          ).statusTerminalStartError(e.toString());
-        });
-      }
+      _startDisplayStartPolling();
+    } catch (e) {
+      setState(() {
+        sessionState = DisplaySessionState.error;
+        statusText = AppLocalizations.of(
+          context,
+        ).statusTerminalStartError(e.toString());
+      });
+    }
   }
 
   void _applyDisplayFrame(Fb10DisplayFrame frame) {
     _lastFrameAt = DateTime.now();
+
     if (!_firstFrameReceived) {
       _firstFrameReceived = true;
       _stopDisplayStartPolling();
     }
 
+    if (_skipNextDisplayFrame) {
+      _skipNextDisplayFrame = false;
+
+      if (_exitRequested) {
+        unawaited(_sendTerminalExit());
+        return;
+      }
+
+      _sendScheduledTx();
+      return;
+    }
+    
     setState(() {
       lines = frame.lines;
       ledLeft = frame.errorLed;
@@ -547,8 +532,11 @@ class _DisplayScreenState extends State<DisplayScreen> {
       statusText = AppLocalizations.of(context).statusTerminalReady;
     });
 
-    // Frame geldi, artık yeni poll gönderebiliriz
-    //_suppressSingleByteEcho = false;
+    if (_exitRequested) {
+      unawaited(_sendTerminalExit());
+      return;
+    }
+
     _sendScheduledTx();
   }
 
@@ -713,8 +701,6 @@ class _DisplayScreenState extends State<DisplayScreen> {
         return Colors.green;
       case DisplaySessionState.error:
         return Colors.red;
-      case DisplaySessionState.handshaking:
-        return Colors.orange;
       case DisplaySessionState.idle:
         return Colors.grey;
     }
@@ -724,120 +710,127 @@ class _DisplayScreenState extends State<DisplayScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
 
-    return Scaffold(
-      backgroundColor: Colors.black.withValues(alpha: 0.45),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            child: Container(
-              width: 382,
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFFE8E8E8),
-                    Color(0xFFC9CDD1),
-                    Color(0xFFF4F4F4),
-                    Color(0xFFB8BEC4),
+    return PopScope(
+      canPop: _allowPop,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        unawaited(_exitTerminalAndPop());
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black.withValues(alpha: 0.45),
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              child: Container(
+                width: 382,
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFFE8E8E8),
+                      Color(0xFFC9CDD1),
+                      Color(0xFFF4F4F4),
+                      Color(0xFFB8BEC4),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: Color(0xFF8A9299), width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      blurRadius: 22,
+                      offset: const Offset(0, 12),
+                    ),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: Color(0xFF8A9299), width: 2),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.35),
-                    blurRadius: 22,
-                    offset: const Offset(0, 12),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: IconButton(
-                      icon: const Icon(Icons.close),
-                      color: Colors.black87,
-                      onPressed: () => Navigator.pop(context),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: IconButton(
+                        icon: const Icon(Icons.close),
+                        color: Colors.black87,
+                        onPressed: _exitTerminalAndPop,
+                      ),
                     ),
-                  ),
 
-                  SizedBox(
-                    width: 180,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          children: [
-                            Text(
-                              l10n.errorLed,
-                              style: const TextStyle(
-                                color: Colors.black87,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.8,
+                    SizedBox(
+                      width: 180,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            children: [
+                              Text(
+                                l10n.errorLed,
+                                style: const TextStyle(
+                                  color: Colors.black87,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.8,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 6),
-                            _led(ledLeft, Colors.red),
-                          ],
-                        ),
-                        Column(
-                          children: [
-                            Text(
-                              l10n.operateLed,
-                              style: const TextStyle(
-                                color: Colors.black87,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.8,
+                              const SizedBox(height: 6),
+                              _led(ledLeft, Colors.red),
+                            ],
+                          ),
+                          Column(
+                            children: [
+                              Text(
+                                l10n.operateLed,
+                                style: const TextStyle(
+                                  color: Colors.black87,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.8,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 6),
-                            _led(ledRight, Colors.green),
-                          ],
-                        ),
-                      ],
+                              const SizedBox(height: 6),
+                              _led(ledRight, Colors.green),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  _display(),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: 342,
-                    child: Row(
-                      children: [
-                        Icon(Icons.circle, size: 11, color: _statusColor()),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            statusText,
-                            style: const TextStyle(
-                              color: Colors.black87,
-                              fontSize: 12,
+                    const SizedBox(height: 14),
+                    _display(),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: 342,
+                      child: Row(
+                        children: [
+                          Icon(Icons.circle, size: 11, color: _statusColor()),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              statusText,
+                              style: const TextStyle(
+                                color: Colors.black87,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 18),
-                  _buttonRow([
-                    _button(l10n.menu, Fb10Commands.menu),
-                    _button(l10n.monitor, Fb10Commands.monitor),
-                    _button(l10n.errors, Fb10Commands.errors),
-                  ]),
-                  const SizedBox(height: 10),
-                  _buttonRow([
-                    _roundPrimaryButton(l10n.quit, Fb10Commands.quit),
-                    _roundPrimaryButton(l10n.ab, Fb10Commands.down),
-                    _roundPrimaryButton(l10n.auf, Fb10Commands.up),
-                    _roundPrimaryButton(l10n.enter, Fb10Commands.enter),
-                  ]),
-                ],
+                    const SizedBox(height: 18),
+                    _buttonRow([
+                      _button(l10n.menu, Fb10Commands.menu),
+                      _button(l10n.monitor, Fb10Commands.monitor),
+                      _button(l10n.errors, Fb10Commands.errors),
+                    ]),
+                    const SizedBox(height: 10),
+                    _buttonRow([
+                      _roundPrimaryButton(l10n.quit, Fb10Commands.quit),
+                      _roundPrimaryButton(l10n.ab, Fb10Commands.down),
+                      _roundPrimaryButton(l10n.auf, Fb10Commands.up),
+                      _roundPrimaryButton(l10n.enter, Fb10Commands.enter),
+                    ]),
+                  ],
+                ),
               ),
             ),
           ),

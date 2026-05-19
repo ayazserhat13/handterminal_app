@@ -106,6 +106,8 @@ class Fb10FrameParser {
 
     if (!_isStatusByte(status)) return false;
 
+    if (_isStatusByte(frame.first)) return false;
+
     final printableCount = frame
         .sublist(0, Fb10DisplayFrame.displayByteCount)
         .where(_isPrintableOrExtended)
@@ -124,7 +126,10 @@ class Fb10FrameParser {
   }
 
   bool _isStatusByte(int byte) {
-    return (byte & 0xF0) == 0x50;
+      return byte == 0x50 ||
+          byte == 0x51 ||
+          byte == 0x52 ||
+          byte == 0x53;
   }
 
   bool _isPrintableOrExtended(int byte) {

@@ -3,6 +3,8 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:handterminal_app/core/ble/ble_characteristic_resolver.dart';
+import 'package:handterminal_app/core/fb10/fb10_commands.dart';
+import 'package:handterminal_app/core/fb10/fb10_write_queue.dart';
 import 'package:handterminal_app/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
@@ -31,6 +33,12 @@ class _HomeScreenState extends State<HomeScreen> {
   BluetoothCharacteristic? writeCharacteristic;
   BluetoothCharacteristic? notifyCharacteristic;
 
+  bool _fb10Ready = false;
+  int _handshakeTryCount = 0;
+  Timer? _handshakeTimer;
+  StreamSubscription<List<int>>? _fb10NotifySub;
+  Fb10WriteQueue? _fb10WriteQueue;
+
   bool _blink = true;
   Timer? _blinkTimer;
 
@@ -58,15 +66,20 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _blinkTimer?.cancel();
     _connectionSub?.cancel();
+    _cleanupFb10Session();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final modeActionsEnabled = isConnected && _fb10Ready;
 
     return Scaffold(
-      drawer: _HomeDrawer(isConnected: isConnected, onConnect: _openBluetooth),
+      drawer: _HomeDrawer(
+        modeActionsEnabled: modeActionsEnabled,
+        onConnect: _openBluetooth,
+      ),
       body: Stack(
         children: [
           const _AluminumBackground(),
@@ -85,6 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: _ModernHomeMenu(
                           isConnected: isConnected,
+                          modeActionsEnabled: modeActionsEnabled,
                           blink: _blink,
                           onConnect: _openBluetooth,
                           onTerminal: _openTerminalPlaceholder,
@@ -161,6 +175,180 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _startFb10Session({
+    required BluetoothCharacteristic writeCharacteristic,
+    required BluetoothCharacteristic notifyCharacteristic,
+    bool initialReady = false,
+  }) {
+    _cleanupFb10Session();
+
+    _fb10WriteQueue = Fb10WriteQueue(
+      writer: (bytes) => _writeFb10Bytes(writeCharacteristic, bytes),
+    );
+    _fb10NotifySub = notifyCharacteristic.onValueReceived.listen(
+      _handleFb10NotifyBytes,
+    );
+
+    _startFb10Handshake(initialReady: initialReady);
+  }
+
+  void _startFb10Handshake({required bool initialReady}) {
+    final queue = _fb10WriteQueue;
+    if (queue == null) return;
+
+    _handshakeTimer?.cancel();
+    queue.clearPending();
+
+    _setFb10Ready(initialReady);
+    _handshakeTryCount = 0;
+
+    var sendWakeNext = true;
+
+    if (initialReady) {
+      debugPrint('HOME: restarting FB10 session in keepalive mode');
+    } else {
+      debugPrint('HOME: FB10 handshake start');
+    }
+
+    Future<void> sendNextSessionByte() async {
+      if (_fb10WriteQueue != queue) return;
+      if (!isConnected) return;
+      if (queue.isBusy) return;
+
+      if (_fb10Ready) {
+        debugPrint('HOME: FB10 keepalive AA');
+
+        try {
+          await queue.enqueue(const [Fb10Commands.handshakeAck]);
+        } catch (e) {
+          debugPrint('HOME: FB10 keepalive write error: $e');
+        }
+
+        return;
+      }
+
+      final byteToSend = sendWakeNext
+          ? Fb10Commands.handshakeWake
+          : Fb10Commands.handshakeRequest;
+      sendWakeNext = !sendWakeNext;
+      _handshakeTryCount++;
+
+      debugPrint(
+        'HOME: FB10 handshake try $_handshakeTryCount byte ${_formatFb10Byte(byteToSend)}',
+      );
+
+      try {
+        await queue.enqueue([byteToSend]);
+      } catch (e) {
+        debugPrint('HOME: FB10 handshake write error: $e');
+      }
+    }
+
+    unawaited(sendNextSessionByte());
+    _handshakeTimer = Timer.periodic(Fb10Timings.handshakeRetryInterval, (_) {
+      unawaited(sendNextSessionByte());
+    });
+  }
+
+  void _handleFb10NotifyBytes(List<int> value) {
+    if (value.isEmpty) return;
+    if (!value.contains(Fb10Commands.handshakeResponse)) return;
+
+    debugPrint('HOME: FB10 RX contains BB');
+    unawaited(_handleFb10HandshakeResponse());
+  }
+
+  Future<void> _handleFb10HandshakeResponse() async {
+    final queue = _fb10WriteQueue;
+    if (queue == null) return;
+
+    queue.clearPending();
+
+    try {
+      await queue.enqueue(const [Fb10Commands.handshakeAck]);
+    } catch (e) {
+      debugPrint('HOME: FB10 handshake ack error: $e');
+      return;
+    }
+
+    if (!mounted || _fb10WriteQueue != queue || !isConnected) return;
+
+    if (!_fb10Ready) {
+      _setFb10Ready(true);
+      debugPrint('HOME: FB10 ready');
+    }
+  }
+
+  void _setFb10Ready(bool ready) {
+    if (_fb10Ready == ready) return;
+
+    if (!mounted) {
+      _fb10Ready = ready;
+      return;
+    }
+
+    setState(() {
+      _fb10Ready = ready;
+    });
+  }
+
+  Future<void> _writeFb10Bytes(
+    BluetoothCharacteristic characteristic,
+    List<int> bytes,
+  ) async {
+    await characteristic.write(
+      bytes,
+      withoutResponse: characteristic.properties.writeWithoutResponse,
+    );
+  }
+
+  void _cleanupFb10Session() {
+    _handshakeTimer?.cancel();
+    _handshakeTimer = null;
+    _fb10NotifySub?.cancel();
+    _fb10NotifySub = null;
+    _fb10WriteQueue?.close();
+    _fb10WriteQueue = null;
+    _fb10Ready = false;
+    _handshakeTryCount = 0;
+  }
+
+  void _handoffFb10SessionToDisplayScreen() {
+    debugPrint('HOME: FB10 session handoff to DisplayScreen');
+    _handshakeTimer?.cancel();
+    _handshakeTimer = null;
+    _fb10NotifySub?.cancel();
+    _fb10NotifySub = null;
+    _fb10WriteQueue?.close();
+    _fb10WriteQueue = null;
+    _handshakeTryCount = 0;
+  }
+
+  void _restartFb10SessionAfterDisplayScreen() {
+    final currentWriteCharacteristic = writeCharacteristic;
+    final currentNotifyCharacteristic = notifyCharacteristic;
+
+    if (!mounted ||
+        !isConnected ||
+        connectedDevice == null ||
+        currentWriteCharacteristic == null ||
+        currentNotifyCharacteristic == null) {
+      debugPrint('HOME: DisplayScreen returned; FB10 session restart skipped');
+      return;
+    }
+
+    debugPrint('HOME: DisplayScreen returned; restarting FB10 session');
+    _startFb10Session(
+      writeCharacteristic: currentWriteCharacteristic,
+      notifyCharacteristic: currentNotifyCharacteristic,
+      initialReady: true,
+    );
+  }
+
+  String _formatFb10Byte(int byte) {
+    return '0x${byte.toRadixString(16).padLeft(2, '0').toUpperCase()}';
+  }
+
   Future<void> _autoReconnect() async {
     if (_isAutoReconnecting) return;
     _isAutoReconnecting = true;
@@ -230,6 +418,11 @@ class _HomeScreenState extends State<HomeScreen> {
         _blink = false;
       });
 
+      _startFb10Session(
+        writeCharacteristic: characteristics.writeCharacteristic,
+        notifyCharacteristic: characteristics.notifyCharacteristic,
+      );
+
       _listenConnectionState(device);
     } catch (_) {
       // Kullanıcı manuel bağlanabilir.
@@ -269,6 +462,17 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     final device = connectedDevice;
+    final currentWriteCharacteristic = writeCharacteristic;
+    final currentNotifyCharacteristic = notifyCharacteristic;
+
+    if (currentWriteCharacteristic != null &&
+        currentNotifyCharacteristic != null) {
+      _startFb10Session(
+        writeCharacteristic: currentWriteCharacteristic,
+        notifyCharacteristic: currentNotifyCharacteristic,
+      );
+    }
+
     if (device != null) {
       _listenConnectionState(device);
 
@@ -289,6 +493,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (state == BluetoothConnectionState.disconnected) {
         final l10n = AppLocalizations.of(context)!;
+
+        _cleanupFb10Session();
 
         setState(() {
           isConnected = false;
@@ -314,7 +520,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openGraph() {
-    if (!isConnected) return;
+    if (!isConnected || !_fb10Ready) return;
 
     Navigator.push(
       context,
@@ -322,27 +528,40 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _openTerminalPlaceholder() {
+  Future<void> _openTerminalPlaceholder() async {
     if (!isConnected ||
+        connectedDevice == null ||
         writeCharacteristic == null ||
         notifyCharacteristic == null) {
       return;
     }
 
-    Navigator.of(context).push(
+    if (!_fb10Ready) {
+      debugPrint('HOME: Terminal open blocked; fb10Ready=false');
+      return;
+    }
+
+    final terminalWriteCharacteristic = writeCharacteristic!;
+    final terminalNotifyCharacteristic = notifyCharacteristic!;
+
+    _handoffFb10SessionToDisplayScreen();
+
+    await Navigator.of(context).push(
       PageRouteBuilder(
         opaque: false,
         barrierColor: Colors.black.withOpacity(0.35),
         pageBuilder: (_, __, ___) => DisplayScreen(
-          writeCharacteristic: writeCharacteristic!,
-          notifyCharacteristic: notifyCharacteristic!,
+          writeCharacteristic: terminalWriteCharacteristic,
+          notifyCharacteristic: terminalNotifyCharacteristic,
         ),
       ),
     );
+
+    _restartFb10SessionAfterDisplayScreen();
   }
 
   void _disabledAction() {
-    if (!isConnected) return;
+    if (!isConnected || !_fb10Ready) return;
   }
 
   void _documentsAction() {
@@ -402,6 +621,7 @@ class _BrushedMetalPainter extends CustomPainter {
 
 class _CircularHomeMenu extends StatelessWidget {
   final bool isConnected;
+  final bool modeActionsEnabled;
   final bool blink;
 
   final VoidCallback onConnect;
@@ -416,6 +636,7 @@ class _CircularHomeMenu extends StatelessWidget {
 
   const _CircularHomeMenu({
     required this.isConnected,
+    required this.modeActionsEnabled,
     required this.blink,
     required this.onConnect,
     required this.onTerminal,
@@ -448,42 +669,42 @@ class _CircularHomeMenu extends StatelessWidget {
         angle: -45,
         icon: Icons.terminal,
         label: l10n.homeTerminal,
-        enabled: isConnected,
+        enabled: modeActionsEnabled,
         onTap: onTerminal,
       ),
       _HomeMenuItem(
         angle: 0,
         icon: Icons.speed,
         label: l10n.homeSpeedCurve,
-        enabled: isConnected,
+        enabled: modeActionsEnabled,
         onTap: onSpeedCurve,
       ),
       _HomeMenuItem(
         angle: 45,
         icon: Icons.system_update_alt,
         label: l10n.homeSoftwareUpdate,
-        enabled: isConnected,
+        enabled: modeActionsEnabled,
         onTap: onSoftwareUpdate,
       ),
       _HomeMenuItem(
         angle: 90,
         icon: Icons.error_outline,
         label: l10n.homeDownloadErrors,
-        enabled: isConnected,
+        enabled: modeActionsEnabled,
         onTap: onDownloadErrors,
       ),
       _HomeMenuItem(
         angle: 135,
         icon: Icons.download,
         label: l10n.homeDownloadParameters,
-        enabled: isConnected,
+        enabled: modeActionsEnabled,
         onTap: onDownloadParameters,
       ),
       _HomeMenuItem(
         angle: 180,
         icon: Icons.upload,
         label: l10n.homeUploadParameters,
-        enabled: isConnected,
+        enabled: modeActionsEnabled,
         onTap: onUploadParameters,
       ),
       _HomeMenuItem(
@@ -548,6 +769,7 @@ class _CircularHomeMenu extends StatelessWidget {
 
 class _ModernHomeMenu extends StatelessWidget {
   final bool isConnected;
+  final bool modeActionsEnabled;
   final bool blink;
 
   final VoidCallback onConnect;
@@ -562,6 +784,7 @@ class _ModernHomeMenu extends StatelessWidget {
 
   const _ModernHomeMenu({
     required this.isConnected,
+    required this.modeActionsEnabled,
     required this.blink,
     required this.onConnect,
     required this.onTerminal,
@@ -607,7 +830,7 @@ class _ModernHomeMenu extends StatelessWidget {
               _ModernMenuButton(
                 icon: Icons.terminal,
                 label: l10n.homeTerminal,
-                enabled: isConnected,
+                enabled: modeActionsEnabled,
                 onTap: onTerminal,
               ),
             ),
@@ -618,7 +841,7 @@ class _ModernHomeMenu extends StatelessWidget {
               _ModernMenuButton(
                 icon: Icons.speed,
                 label: l10n.homeSpeedCurve,
-                enabled: isConnected,
+                enabled: modeActionsEnabled,
                 onTap: onSpeedCurve,
               ),
             ),
@@ -640,7 +863,7 @@ class _ModernHomeMenu extends StatelessWidget {
               _ModernMenuButton(
                 icon: Icons.download,
                 label: l10n.homeDownloadParameters,
-                enabled: isConnected,
+                enabled: modeActionsEnabled,
                 onTap: onDownloadParameters,
               ),
             ),
@@ -651,7 +874,7 @@ class _ModernHomeMenu extends StatelessWidget {
               _ModernMenuButton(
                 icon: Icons.upload,
                 label: l10n.homeUploadParameters,
-                enabled: isConnected,
+                enabled: modeActionsEnabled,
                 onTap: onUploadParameters,
               ),
             ),
@@ -662,7 +885,7 @@ class _ModernHomeMenu extends StatelessWidget {
               _ModernMenuButton(
                 icon: Icons.error_outline,
                 label: l10n.homeDownloadErrors,
-                enabled: isConnected,
+                enabled: modeActionsEnabled,
                 onTap: onDownloadErrors,
               ),
             ),
@@ -673,7 +896,7 @@ class _ModernHomeMenu extends StatelessWidget {
               _ModernMenuButton(
                 icon: Icons.system_update_alt,
                 label: l10n.homeSoftwareUpdate,
-                enabled: isConnected,
+                enabled: modeActionsEnabled,
                 onTap: onSoftwareUpdate,
               ),
             ),
@@ -1044,10 +1267,13 @@ class _FlowLinePainter extends CustomPainter {
 }
 
 class _HomeDrawer extends StatelessWidget {
-  final bool isConnected;
+  final bool modeActionsEnabled;
   final VoidCallback onConnect;
 
-  const _HomeDrawer({required this.isConnected, required this.onConnect});
+  const _HomeDrawer({
+    required this.modeActionsEnabled,
+    required this.onConnect,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1075,14 +1301,14 @@ class _HomeDrawer extends StatelessWidget {
               context,
               icon: Icons.terminal,
               title: l10n.homeTerminal,
-              enabled: isConnected,
+              enabled: modeActionsEnabled,
               onTap: () {},
             ),
             _drawerItem(
               context,
               icon: Icons.speed,
               title: l10n.homeSpeedCurve,
-              enabled: isConnected,
+              enabled: modeActionsEnabled,
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
@@ -1095,28 +1321,28 @@ class _HomeDrawer extends StatelessWidget {
               context,
               icon: Icons.system_update_alt,
               title: l10n.homeSoftwareUpdate,
-              enabled: isConnected,
+              enabled: modeActionsEnabled,
               onTap: () {},
             ),
             _drawerItem(
               context,
               icon: Icons.error_outline,
               title: l10n.homeDownloadErrors,
-              enabled: isConnected,
+              enabled: modeActionsEnabled,
               onTap: () {},
             ),
             _drawerItem(
               context,
               icon: Icons.download,
               title: l10n.homeDownloadParameters,
-              enabled: isConnected,
+              enabled: modeActionsEnabled,
               onTap: () {},
             ),
             _drawerItem(
               context,
               icon: Icons.upload,
               title: l10n.homeUploadParameters,
-              enabled: isConnected,
+              enabled: modeActionsEnabled,
               onTap: () {},
             ),
             const Divider(),

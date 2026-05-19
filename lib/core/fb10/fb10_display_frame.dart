@@ -1,3 +1,4 @@
+
 class Fb10DisplayFrame {
   static const int displayByteCount = 64;
   static const int frameByteCount = 65;
