@@ -1,0 +1,124 @@
+{
+  "appTitle": "Handterminal App",
+  "screenTitle": "TFT Ekran Simülasyonu",
+
+  "menu": "MENÜ",
+  "display": "Ekran",
+  "graph": "Grafik",
+  "connection": "Bağlantı",
+  "settings": "Ayarlar",
+  "monitoring": "İzleme",
+  "errors": "Hatalar",
+  "info": "Bilgi",
+
+  "quit": "Çık",
+  "down": "Aşağı",
+  "up": "Yukarı",
+  "enter": "Enter",
+
+  "lcdLineHello": "Merhaba Dünya!",
+  "lcdLineFloor": "Kat: 3 Yukarı ",
+  "lcdLineReady": "Sistem Hazır..",
+  "lcdLineNoError": "Hata Yok      ",
+
+  "fb10Display": "FB10 Ekran",
+  "errorLed": "HATA",
+  "operateLed": "ÇALIŞMA",
+  "monitor": "Monitör",
+  "ab": "AŞAĞI",
+  "auf": "YUKARI",
+
+  "statusPreparingConnection": "Bağlantı hazırlanıyor...",
+  "statusHandshakeStarting": "Handshake başlatılıyor...",
+  "statusWaitingForBb": "0xBB bekleniyor...",
+  "statusFirstBbReceived": "İlk 0xBB alındı, 0xAA gönderiliyor...",
+  "statusSecondBbReceived": "İkinci 0xBB alındı, terminal başlatılıyor...",
+  "statusTerminalReady": "Terminal hazır",
+  "statusKeySendError": "Tuş gönderme hatası",
+  "statusBbTimeout": "Zaman aşımı: 0xBB alınmadı",
+
+  "statusHandshakeError": "Handshake hatası: {error}",
+  "@statusHandshakeError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+
+  "statusTerminalStartError": "Terminal başlatma hatası: {error}",
+  "@statusTerminalStartError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+
+  "homeConnect": "Bağlan",
+  "homeTerminal": "Terminal",
+  "homeSpeedCurve": "Hız Eğrisi",
+  "homeSoftwareUpdate": "Yazılım Güncelleme",
+  "homeDownloadErrors": "Hataları İndir",
+  "homeDownloadParameters": "Parametreleri İndir",
+  "homeUploadParameters": "Parametre Yükle",
+  "homeDocuments": "Dokümanlar",
+  "homeAbout": "Hakkında",
+  "homeNotConnected": "Bağlı değil",
+  "homeConnectHint": "Lütfen Bluetooth ile cihaza bağlanın.",
+
+  "bluetoothTitle": "Bluetooth Bağlantısı",
+  "bluetoothReady": "Hazır",
+  "bluetoothScanning": "Cihazlar aranıyor...",
+  "bluetoothScanComplete": "Arama tamamlandı",
+  "bluetoothNoDevicesFound": "Cihaz bulunamadı",
+  "bluetoothUnknownDevice": "Bilinmeyen Cihaz",
+  "bluetoothScan": "Ara",
+  "bluetoothStop": "Durdur",
+  "bluetoothNotSupported": "Bu cihaz BLE desteklemiyor",
+  "bluetoothScanError": "Arama hatası",
+  "bluetoothStopError": "Durdurma hatası",
+  "bluetoothStopped": "Arama durduruldu",
+  "bluetoothConnecting": "{deviceName} cihazına bağlanılıyor...",
+  "@bluetoothConnecting": {
+    "placeholders": {
+      "deviceName": {}
+    }
+  },
+  "bluetoothMissingCharacteristics": "Bağlandı, ancak gerekli karakteristikler bulunamadı",
+  "bluetoothConnectionError": "Bağlantı hatası",
+  "bluetoothConnectionLost": "Bluetooth bağlantısı koptu",
+  "bluetoothTurnOnRequired": "Bluetooth açık olmalı",
+  "bluetoothReconnecting": "Yeniden bağlanılıyor...",
+
+  "parametersTitle": "Parametreler",
+  "parameterExportSubtitle": "FB10 parametre dışa aktarımı",
+  "downloadedPackets": "İndirilen paketler",
+  "lastParameter": "Son parametre",
+  "connectionReady": "Hazır",
+  "connectionWaiting": "Bekleniyor",
+  "export": "Dışa aktarım",
+  "exportReady": "Hazır",
+  "exportPreparing": "Hazırlanıyor",
+  "txtExportReady": "TXT dışa aktarımı hazır",
+  "exportDescription": "Dışa aktarılan parametre dosyası kaydedilebilir veya paylaşılabilir.",
+  "saveTxt": "TXT Kaydet",
+  "preview": "Önizleme",
+  "downloadProgress": "İndirme ilerlemesi",
+  "parameterProgressValue": "{current} / {total}",
+  "@parameterProgressValue": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "percentComplete": "%{percent}",
+  "@percentComplete": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "noParameter": "—"
+}

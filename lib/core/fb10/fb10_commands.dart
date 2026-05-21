@@ -3,6 +3,7 @@ class Fb10Commands {
   static const int handshakeRequest = 0x03;
   static const int handshakeAck = 0xAA;
   static const int handshakeResponse = 0xBB;
+  static const int parameterDownload = 0x10;
   static const int startTerminal = 0x50;
   static const int terminalExit = 0xCC;
   static const int idle = 0xAF;

@@ -9,6 +9,7 @@ import 'package:handterminal_app/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'display_screen.dart';
+import 'parameter_download_screen.dart';
 
 import 'bluetooth.dart';
 import 'graph_screen.dart';
@@ -105,7 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           onSpeedCurve: _openGraph,
                           onSoftwareUpdate: _disabledAction,
                           onDownloadErrors: _disabledAction,
-                          onDownloadParameters: _disabledAction,
+                          onDownloadParameters: _openParameterDownload,
                           onUploadParameters: _disabledAction,
                           onDocuments: _documentsAction,
                           onAbout: _aboutAction,
@@ -556,8 +557,65 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
-
     _restartFb10SessionAfterDisplayScreen();
+  }
+
+  Future<void> _openParameterDownload() async {
+    if (!isConnected ||
+        connectedDevice == null ||
+        writeCharacteristic == null ||
+        notifyCharacteristic == null ||
+        !_fb10Ready) {
+      debugPrint('HOME: Parameter download blocked; fb10Ready=false');
+      return;
+    }
+
+    final parameterWriteCharacteristic = writeCharacteristic!;
+    final parameterNotifyCharacteristic = notifyCharacteristic!;
+
+    debugPrint('HOME: FB10 session handoff to ParameterDownloadScreen');
+    _handshakeTimer?.cancel();
+    _handshakeTimer = null;
+    _fb10NotifySub?.cancel();
+    _fb10NotifySub = null;
+    _fb10WriteQueue?.close();
+    _fb10WriteQueue = null;
+    _handshakeTryCount = 0;
+
+    debugPrint('HOME: opening ParameterDownloadScreen');
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ParameterDownloadScreen(
+          writeCharacteristic: parameterWriteCharacteristic,
+          notifyCharacteristic: parameterNotifyCharacteristic,
+        ),
+      ),
+    );
+    
+    debugPrint('HOME: ParameterDownloadScreen pop completed');
+
+    final currentWriteCharacteristic = writeCharacteristic;
+    final currentNotifyCharacteristic = notifyCharacteristic;
+
+    if (!mounted ||
+        !isConnected ||
+        connectedDevice == null ||
+        currentWriteCharacteristic == null ||
+        currentNotifyCharacteristic == null) {
+      debugPrint(
+        'HOME: ParameterDownloadScreen returned; FB10 session restart skipped',
+      );
+      return;
+    }
+
+    debugPrint(
+      'HOME: ParameterDownloadScreen returned; restarting FB10 session',
+    );
+    _startFb10Session(
+      writeCharacteristic: currentWriteCharacteristic,
+      notifyCharacteristic: currentNotifyCharacteristic,
+      initialReady: true,
+    );
   }
 
   void _disabledAction() {

@@ -9,6 +9,7 @@ import 'app_localizations_de.dart';
 import 'app_localizations_en.dart';
 import 'app_localizations_fr.dart';
 import 'app_localizations_nl.dart';
+import 'app_localizations_tr.dart';
 
 // ignore_for_file: type=lint
 
@@ -100,6 +101,7 @@ abstract class AppLocalizations {
     Locale('en'),
     Locale('fr'),
     Locale('nl'),
+    Locale('tr'),
   ];
 
   /// No description provided for @appTitle.
@@ -479,6 +481,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reconnecting...'**
   String get bluetoothReconnecting;
+
+  /// No description provided for @parametersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Parameters'**
+  String get parametersTitle;
+
+  /// No description provided for @parameterExportSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'FB10 parameter export'**
+  String get parameterExportSubtitle;
+
+  /// No description provided for @downloadedPackets.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded packets'**
+  String get downloadedPackets;
+
+  /// No description provided for @lastParameter.
+  ///
+  /// In en, this message translates to:
+  /// **'Last parameter'**
+  String get lastParameter;
+
+  /// No description provided for @connectionReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready'**
+  String get connectionReady;
+
+  /// No description provided for @connectionWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting'**
+  String get connectionWaiting;
+
+  /// No description provided for @export.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get export;
+
+  /// No description provided for @exportReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready'**
+  String get exportReady;
+
+  /// No description provided for @exportPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing'**
+  String get exportPreparing;
+
+  /// No description provided for @txtExportReady.
+  ///
+  /// In en, this message translates to:
+  /// **'TXT Export Ready'**
+  String get txtExportReady;
+
+  /// No description provided for @exportDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Exported parameter file can be saved or shared.'**
+  String get exportDescription;
+
+  /// No description provided for @saveTxt.
+  ///
+  /// In en, this message translates to:
+  /// **'Save TXT'**
+  String get saveTxt;
+
+  /// No description provided for @preview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get preview;
+
+  /// No description provided for @downloadProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Download progress'**
+  String get downloadProgress;
+
+  /// No description provided for @parameterProgressValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{current} / {total}'**
+  String parameterProgressValue(int current, int total);
+
+  /// No description provided for @percentComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}%'**
+  String percentComplete(int percent);
+
+  /// No description provided for @noParameter.
+  ///
+  /// In en, this message translates to:
+  /// **'—'**
+  String get noParameter;
 }
 
 class _AppLocalizationsDelegate
@@ -492,7 +596,7 @@ class _AppLocalizationsDelegate
 
   @override
   bool isSupported(Locale locale) =>
-      <String>['de', 'en', 'fr', 'nl'].contains(locale.languageCode);
+      <String>['de', 'en', 'fr', 'nl', 'tr'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
@@ -509,6 +613,8 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
       return AppLocalizationsFr();
     case 'nl':
       return AppLocalizationsNl();
+    case 'tr':
+      return AppLocalizationsTr();
   }
 
   throw FlutterError(

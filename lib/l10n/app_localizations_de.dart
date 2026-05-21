@@ -206,4 +206,60 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get bluetoothReconnecting => 'Verbindung wird wiederhergestellt...';
+
+  @override
+  String get parametersTitle => 'Parameter';
+
+  @override
+  String get parameterExportSubtitle => 'FB10-Parameterexport';
+
+  @override
+  String get downloadedPackets => 'Geladene Pakete';
+
+  @override
+  String get lastParameter => 'Letzter Parameter';
+
+  @override
+  String get connectionReady => 'Bereit';
+
+  @override
+  String get connectionWaiting => 'Warten';
+
+  @override
+  String get export => 'Export';
+
+  @override
+  String get exportReady => 'Bereit';
+
+  @override
+  String get exportPreparing => 'In Vorbereitung';
+
+  @override
+  String get txtExportReady => 'TXT-Export bereit';
+
+  @override
+  String get exportDescription =>
+      'Die exportierte Parameterdatei kann gespeichert oder geteilt werden.';
+
+  @override
+  String get saveTxt => 'TXT speichern';
+
+  @override
+  String get preview => 'Vorschau';
+
+  @override
+  String get downloadProgress => 'Download-Fortschritt';
+
+  @override
+  String parameterProgressValue(int current, int total) {
+    return '$current / $total';
+  }
+
+  @override
+  String percentComplete(int percent) {
+    return '$percent %';
+  }
+
+  @override
+  String get noParameter => '—';
 }
