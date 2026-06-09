@@ -26,6 +26,7 @@ class ParameterDownloadScreen extends StatefulWidget {
 
 class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
   static const int _expectedLastIndex = 138;
+  static const bool _useEepromOnlyDownload = true;
   static const Duration _keepaliveInterval = Duration(milliseconds: 250);
   static const Color _accentColor = Color(0xFF0A4C93);
   static const Color _readyColor = Color(0xFF0F7B4B);
@@ -474,6 +475,12 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
       });
     }
 
+    if (_useEepromOnlyDownload) {
+      debugPrint('PARAM EEPROM-only download mode');
+      await _startEepromRead();
+      return;
+    }
+
     await _writeBytes(const [Fb10Commands.parameterDownload]);
     debugPrint('PARAM START 0x10');
   }
@@ -631,12 +638,26 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
     }
 
     debugPrint('PARAM EEPROM complete words=$wordsRead');
+    final txtExport = _rebuildTxtExport();
+
+    if (mounted) {
+      setState(() {
+        _txtExport = txtExport;
+        _downloadComplete = true;
+      });
+    } else {
+      _txtExport = txtExport;
+      _downloadComplete = true;
+    }
+
     _logEepromParameterVerification();
     _logFullEepromParameterVerification();
     unawaited(_restartHandshakeAfterEeprom());
   }
 
   void _logEepromParameterVerification() {
+    if (_useEepromOnlyDownload || _parameters.isEmpty) return;
+
     const verificationIndexes = <int>[30, 31, 32, 94, 98, 100, 110];
     var matchCount = 0;
 
@@ -664,6 +685,13 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
   }
 
   void _logFullEepromParameterVerification() {
+    if (_useEepromOnlyDownload || _parameters.isEmpty) {
+      debugPrint(
+        'PARAM EEPROM FULL VERIFY skipped; parameter download disabled',
+      );
+      return;
+    }
+
     const maxIssueLogs = 20;
     final issueLogs = <String>[];
     var matchCount = 0;
@@ -741,8 +769,7 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
 
     _rxBuffer.clear();
     debugPrint('PARAM download complete');
-    final txtExport = _buildReadableTxtExportV1();
-    debugPrint('PARAM TXT export ready (${txtExport.length} chars)');
+    final txtExport = _rebuildTxtExport();
 
     if (mounted) {
       setState(() {
@@ -755,6 +782,12 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
     }
 
     _startKeepalive();
+  }
+
+  String _rebuildTxtExport() {
+    final txtExport = _buildReadableTxtExportV1();
+    debugPrint('PARAM TXT export ready (${txtExport.length} chars)');
+    return txtExport;
   }
 
   void _startKeepalive({bool sendImmediately = true}) {
@@ -803,6 +836,7 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
         _driverReady &&
         !_waitingForHandshakeBb &&
         !_eepromReadStarted &&
+        (!_useEepromOnlyDownload || _eepromReadComplete) &&
         _txtExport != null;
   }
 
@@ -2054,10 +2088,12 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
   }
 
   int get _expectedPacketCount {
+    if (_useEepromOnlyDownload) return _eepromWords.length;
     return _expectedLastIndex + 1;
   }
 
   int get _displayPacketCount {
+    if (_useEepromOnlyDownload) return _displayEepromPacketCount;
     return _packetCount.clamp(0, _expectedPacketCount).toInt();
   }
 
@@ -2075,7 +2111,10 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
   }
 
   bool get _canCloseScreen {
-    return _driverReady && !_waitingForHandshakeBb && !_eepromReadStarted;
+    return _driverReady &&
+        !_waitingForHandshakeBb &&
+        !_eepromReadStarted &&
+        (!_useEepromOnlyDownload || _eepromReadComplete);
   }
 
   Future<void> _closeScreen() async {
@@ -2157,10 +2196,12 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
   }
 
   Widget _buildStatusCard(BuildContext context, AppLocalizations l10n) {
-    final lastParameter = _lastIndex?.toString() ?? l10n.noParameter;
     final lastEepromAddress = _lastEepromAddress == null
         ? '-'
         : '${_lastEepromAddress!} value ${_lastEepromValue ?? '-'}';
+    final lastParameter = _useEepromOnlyDownload
+        ? lastEepromAddress
+        : _lastIndex?.toString() ?? l10n.noParameter;
     final eepromCompleteText = _eepromReadComplete ? 'true' : 'false';
     final connectionText = _driverReady
         ? l10n.connectionReady
