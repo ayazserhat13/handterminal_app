@@ -25,8 +25,6 @@ class ParameterDownloadScreen extends StatefulWidget {
 }
 
 class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
-  static const int _expectedLastIndex = 138;
-  static const bool _useEepromOnlyDownload = true;
   static const Duration _keepaliveInterval = Duration(milliseconds: 250);
   static const Color _accentColor = Color(0xFF0A4C93);
   static const Color _readyColor = Color(0xFF0F7B4B);
@@ -253,150 +251,6 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
     4: '10 kHz',
     5: '12 kHz',
   };
-  static const List<String> _rtcDspRamFieldNames = <String>[
-    'Start',
-    'GeschwVn',
-    'GeschwVi',
-    'GeschwV0',
-    'GeschwV1',
-    'GeschwV2',
-    'GeschwV3',
-    'Beschl',
-    'RuckBesh',
-    'Verzoe',
-    'RuckVerz',
-    'Messfahrt',
-    'StartVer',
-    'BremswegV0',
-    'DrkEinf',
-    'StartBoost',
-    'Start1P',
-    'Start1I',
-    'Start1T',
-    'BoostK',
-    'SchlupfK',
-    'LosreisDrehz',
-    'LosreisT',
-    'GeberSystem',
-    'GeberABRL',
-    'InkStrich',
-    'MotDrehz',
-    'MotFreq',
-    'MotStrom',
-    'MotCosphi',
-    'GetUeber',
-    'GetTreib',
-    'GetAufh',
-    'RelaisV3',
-    'RelaisVx',
-    'RelaisPr',
-    'RelaisPrVx',
-    'progEingang',
-    'Passwort',
-    'Passwort_0',
-    'Sprache',
-    'DaempfStr',
-    'DaempfBes',
-    'DaempfFar',
-    'DaempfVer',
-    'DaempfReg',
-    'DrRegP',
-    'DrRegI',
-    'SyncPol',
-    'StRegIdP',
-    'StRegIdI',
-    'StRegIqP',
-    'StRegIqI',
-    'FeldEin',
-    'FeldAbs',
-    'FeldPT1',
-    'VRegPDyn',
-    'VRegPDif',
-    'StrRegIqPT1',
-    'MotMag',
-    'UmrTyp',
-    'MaxStrom',
-    'StromBgr',
-    'Netzspg',
-    'StrSens',
-    'MessWid',
-    'BrmMin',
-    'BrmMax',
-    'IGBTTot',
-    'WartHSE',
-    'WartHSA',
-    'NachBrm',
-    'VzTaStart',
-    'Schleich',
-    'VzVorlad',
-    'Menu0',
-    'VzTaFahrt',
-    'BremsVx',
-    'ChopFreq',
-    'MotKaltleiter',
-    'SSITakt',
-    'SSIBits',
-    'Hardware',
-    'VzInspektion',
-    'Eva_Bat_Spg',
-    'Eva_UeberSteuer',
-    'Bussys',
-    'Spitzfunc',
-    'DCPKorrektur',
-    'HSUeberw',
-    'Kunde',
-    'MotorStromlos',
-    'Fehler01_16',
-    'Fehler17_32',
-    'BremsenUw',
-    'DCAnteil',
-    'Para_Frei05',
-    'progEingangV2',
-    'IGBTTakt',
-    'UdUqmax',
-    'PERelais',
-    'StartArt',
-    'StrRegI',
-    'StrRegD',
-    'StrRegC',
-    'DrRegD',
-    'DrRegC',
-    'Start1D',
-    'DaempfEinf',
-    'DrRegFaktorStart',
-    'UMotor',
-    'SyncSpalt',
-    'Para_Frei21',
-    'BremswegV1de',
-    'BremswegV2de',
-    'BremswegV3de',
-    'Para_Frei25',
-    'BremswegVi_H',
-    'BremswegVi_L',
-    'BremswegV1_H',
-    'BremswegV1_L',
-    'BremswegV2_H',
-    'BremswegV2_L',
-    'BremswegV3_H',
-    'BremswegV3_L',
-    'Leer',
-    'RTC',
-    'LufterON',
-    'LufterOFF',
-    'Kurzschluss',
-    'progEingangV3',
-    'SimDSPTyp',
-    'DCPGrenzgeschw',
-    'DrRegFaktor',
-    'ABTeiler',
-    'VzSteuinms',
-    'Host_Version',
-    'Checksum',
-    'End',
-  ];
-
-  final Map<int, int> _parameters = <int, int>{};
-  final List<int> _rxBuffer = <int>[];
   final List<int?> _eepromWords = List<int?>.filled(256, null);
   final List<int> _eepromRxBuffer = <int>[];
 
@@ -406,8 +260,6 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
   Timer? _keepaliveTimer;
   Timer? _handshakeTimer;
 
-  int _packetCount = 0;
-  int? _lastIndex;
   String? _txtExport;
   bool _eepromReadStarted = false;
   bool _eepromReadComplete = false;
@@ -425,7 +277,7 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
     super.initState();
     _writeQueue = Fb10WriteQueue(writer: _writeBytesDirect);
     _listenNotify();
-    unawaited(_startParameterDownload());
+    unawaited(_startEepromDownload());
   }
 
   @override
@@ -453,17 +305,13 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
     });
   }
 
-  Future<void> _startParameterDownload() async {
+  Future<void> _startEepromDownload() async {
     _keepaliveTimer?.cancel();
-    _rxBuffer.clear();
     _eepromRxBuffer.clear();
     _eepromWords.fillRange(0, _eepromWords.length, null);
-    _parameters.clear();
 
     if (mounted) {
       setState(() {
-        _packetCount = 0;
-        _lastIndex = null;
         _txtExport = null;
         _eepromReadStarted = false;
         _eepromReadComplete = false;
@@ -475,14 +323,8 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
       });
     }
 
-    if (_useEepromOnlyDownload) {
-      debugPrint('PARAM EEPROM-only download mode');
-      await _startEepromRead();
-      return;
-    }
-
-    await _writeBytes(const [Fb10Commands.parameterDownload]);
-    debugPrint('PARAM START 0x10');
+    debugPrint('PARAM EEPROM-only download mode');
+    await _startEepromRead();
   }
 
   Future<void> _handleNotifyChunk(List<int> value) async {
@@ -502,33 +344,12 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
     }
 
     if (_downloadComplete) {
-      await _handleKeepaliveNotify(value);
+      _handleKeepaliveNotify(value);
       return;
-    }
-
-    _rxBuffer.addAll(value);
-
-    while (_rxBuffer.length >= 4) {
-      final index = _rxBuffer[0];
-      final low = _rxBuffer[1];
-      final high = _rxBuffer[2];
-      final checksum = _rxBuffer[3];
-      final expectedChecksum = (index + low + high) & 0xFF;
-
-      if (checksum != expectedChecksum) {
-        debugPrint('PARAM resync drop ${_formatByte(index)}');
-        _rxBuffer.removeAt(0);
-        continue;
-      }
-
-      _rxBuffer.removeRange(0, 4);
-
-      await _handlePacket(index, low, high, checksum);
-      if (_downloadComplete) return;
     }
   }
 
-  Future<void> _handleKeepaliveNotify(List<int> value) async {
+  void _handleKeepaliveNotify(List<int> value) {
     if (!value.contains(Fb10Commands.handshakeResponse)) return;
 
     debugPrint('PARAM RX 0xBB ready');
@@ -539,10 +360,6 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
       });
     } else {
       _driverReady = true;
-    }
-
-    if (!_eepromReadStarted && !_eepromReadComplete) {
-      await _startEepromRead();
     }
   }
 
@@ -650,138 +467,7 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
       _downloadComplete = true;
     }
 
-    _logEepromParameterVerification();
-    _logFullEepromParameterVerification();
     unawaited(_restartHandshakeAfterEeprom());
-  }
-
-  void _logEepromParameterVerification() {
-    if (_useEepromOnlyDownload || _parameters.isEmpty) return;
-
-    const verificationIndexes = <int>[30, 31, 32, 94, 98, 100, 110];
-    var matchCount = 0;
-
-    for (final index in verificationIndexes) {
-      final parameterValue = _parameters[index];
-      final eepromValue = _eepromWords[index];
-      final matches =
-          parameterValue != null &&
-          eepromValue != null &&
-          parameterValue == eepromValue;
-      if (matches) {
-        matchCount++;
-      }
-
-      debugPrint(
-        'PARAM EEPROM VERIFY idx=$index '
-        'param=$parameterValue eeprom=$eepromValue match=$matches',
-      );
-    }
-
-    debugPrint(
-      'PARAM EEPROM VERIFY summary matches=$matchCount/'
-      '${verificationIndexes.length}',
-    );
-  }
-
-  void _logFullEepromParameterVerification() {
-    if (_useEepromOnlyDownload || _parameters.isEmpty) {
-      debugPrint(
-        'PARAM EEPROM FULL VERIFY skipped; parameter download disabled',
-      );
-      return;
-    }
-
-    const maxIssueLogs = 20;
-    final issueLogs = <String>[];
-    var matchCount = 0;
-    var mismatchCount = 0;
-    var missingCount = 0;
-
-    for (var index = 0; index <= _expectedLastIndex; index++) {
-      final parameterValue = _parameters[index];
-      final eepromValue = _eepromWords[index];
-
-      if (parameterValue == null || eepromValue == null) {
-        missingCount++;
-        if (issueLogs.length < maxIssueLogs) {
-          issueLogs.add(
-            'PARAM EEPROM FULL VERIFY issue idx=$index '
-            'param=$parameterValue eeprom=$eepromValue reason=missing',
-          );
-        }
-        continue;
-      }
-
-      if (parameterValue == eepromValue) {
-        matchCount++;
-      } else {
-        mismatchCount++;
-        if (issueLogs.length < maxIssueLogs) {
-          issueLogs.add(
-            'PARAM EEPROM FULL VERIFY issue idx=$index '
-            'param=$parameterValue eeprom=$eepromValue reason=mismatch',
-          );
-        }
-      }
-    }
-
-    debugPrint(
-      'PARAM EEPROM FULL VERIFY matches=$matchCount/'
-      '${_expectedLastIndex + 1} mismatches=$mismatchCount '
-      'missing=$missingCount',
-    );
-
-    for (final issueLog in issueLogs) {
-      debugPrint(issueLog);
-    }
-  }
-
-  Future<void> _handlePacket(int index, int low, int high, int checksum) async {
-    final expectedChecksum = (index + low + high) & 0xFF;
-
-    if (checksum != expectedChecksum) {
-      debugPrint('PARAM: checksum error idx=$index');
-      return;
-    }
-
-    final value = low | (high << 8);
-    _parameters[index] = value;
-
-    if (mounted) {
-      setState(() {
-        _packetCount++;
-        _lastIndex = index;
-      });
-    }
-
-    debugPrint('PARAM RX idx=$index value=$value checksum=$checksum');
-    await _writeBytes([checksum]);
-    debugPrint('PARAM ACK ${_formatByte(checksum)}');
-
-    if (index >= _expectedLastIndex) {
-      _completeDownload();
-    }
-  }
-
-  void _completeDownload() {
-    if (_downloadComplete) return;
-
-    _rxBuffer.clear();
-    debugPrint('PARAM download complete');
-    final txtExport = _rebuildTxtExport();
-
-    if (mounted) {
-      setState(() {
-        _txtExport = txtExport;
-        _downloadComplete = true;
-      });
-    } else {
-      _txtExport = txtExport;
-      _downloadComplete = true;
-    }
-
-    _startKeepalive();
   }
 
   String _rebuildTxtExport() {
@@ -825,10 +511,10 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
   }
 
   int? _parameterValue(int index) {
-    if (_eepromReadComplete && index >= 0 && index < _eepromWords.length) {
+    if (index >= 0 && index < _eepromWords.length) {
       return _eepromWords[index];
     }
-    return _parameters[index];
+    return null;
   }
 
   bool get _canSaveTxt {
@@ -836,7 +522,7 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
         _driverReady &&
         !_waitingForHandshakeBb &&
         !_eepromReadStarted &&
-        (!_useEepromOnlyDownload || _eepromReadComplete) &&
+        _eepromReadComplete &&
         _txtExport != null;
   }
 
@@ -856,6 +542,7 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
       await file.writeAsString(txtExport);
       debugPrint('PARAM TXT write ${file.path}');
 
+      if (!mounted) return;
       final box = context.findRenderObject() as RenderBox?;
 
       await Share.shareXFiles(
@@ -967,33 +654,6 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
     _startKeepalive(sendImmediately: false);
   }
 
-  String _buildRawTxtExport() {
-    final now = DateTime.now();
-    final buffer = StringBuffer()
-      ..writeln('FB10 Parameter Export')
-      ..writeln('Date: ${_formatExportDateTime(now)}')
-      ..writeln('Source: FB10')
-      ..writeln('Format: Raw RTC_DSPRAM')
-      ..writeln()
-      ..writeln('Index;Parameter;Decimal;Hex');
-
-    for (var index = 0; index <= _expectedLastIndex; index++) {
-      final indexText = index.toString().padLeft(3, '0');
-      final name = _parameterNameForIndex(index);
-      final value = _parameters[index];
-
-      if (value == null) {
-        buffer.writeln('$indexText;$name;;');
-      } else {
-        buffer.writeln('$indexText;$name;$value;${_formatWord(value)}');
-      }
-    }
-
-    return buffer.toString();
-  }
-
-  // Readable export is intentionally not wired to Save TXT yet; Save TXT remains raw.
-  // ignore: unused_element
   String _buildReadableTxtExportV1() {
     final now = DateTime.now();
     final buffer = StringBuffer()
@@ -2074,27 +1734,12 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
     return 'fb10_parameters_${date}_$time.txt';
   }
 
-  String _parameterNameForIndex(int index) {
-    if (index < _rtcDspRamFieldNames.length) {
-      final name = _rtcDspRamFieldNames[index];
-      if (name.isNotEmpty) return name;
-    }
-
-    return 'Param_${index.toString().padLeft(3, '0')}';
-  }
-
-  String _formatWord(int value) {
-    return '0x${(value & 0xFFFF).toRadixString(16).padLeft(4, '0').toUpperCase()}';
-  }
-
   int get _expectedPacketCount {
-    if (_useEepromOnlyDownload) return _eepromWords.length;
-    return _expectedLastIndex + 1;
+    return _eepromWords.length;
   }
 
   int get _displayPacketCount {
-    if (_useEepromOnlyDownload) return _displayEepromPacketCount;
-    return _packetCount.clamp(0, _expectedPacketCount).toInt();
+    return _displayEepromPacketCount;
   }
 
   double get _downloadProgress {
@@ -2114,7 +1759,7 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
     return _driverReady &&
         !_waitingForHandshakeBb &&
         !_eepromReadStarted &&
-        (!_useEepromOnlyDownload || _eepromReadComplete);
+        _eepromReadComplete;
   }
 
   Future<void> _closeScreen() async {
@@ -2199,9 +1844,7 @@ class _ParameterDownloadScreenState extends State<ParameterDownloadScreen> {
     final lastEepromAddress = _lastEepromAddress == null
         ? '-'
         : '${_lastEepromAddress!} value ${_lastEepromValue ?? '-'}';
-    final lastParameter = _useEepromOnlyDownload
-        ? lastEepromAddress
-        : _lastIndex?.toString() ?? l10n.noParameter;
+    final lastParameter = lastEepromAddress;
     final eepromCompleteText = _eepromReadComplete ? 'true' : 'false';
     final connectionText = _driverReady
         ? l10n.connectionReady
