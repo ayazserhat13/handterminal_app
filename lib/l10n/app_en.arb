@@ -87,7 +87,7 @@
   "bluetoothTurnOnRequired": "Bluetooth must be turned on",
   "bluetoothReconnecting": "Reconnecting...",
 
-  "parametersTitle": "Parameters",
+  "parametersTitle": "Parameter export",
   "parameterExportSubtitle": "FB10 parameter export",
   "downloadedPackets": "Downloaded packets",
   "lastParameter": "Last parameter",

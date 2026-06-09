@@ -208,47 +208,47 @@ class AppLocalizationsNl extends AppLocalizations {
   String get bluetoothReconnecting => 'Opnieuw verbinden...';
 
   @override
-  String get parametersTitle => 'Parameters';
+  String get parametersTitle => 'Parameterexport';
 
   @override
-  String get parameterExportSubtitle => 'FB10 parameter export';
+  String get parameterExportSubtitle => 'FB10-parameterexport';
 
   @override
-  String get downloadedPackets => 'Downloaded packets';
+  String get downloadedPackets => 'Gedownloade pakketten';
 
   @override
-  String get lastParameter => 'Last parameter';
+  String get lastParameter => 'Laatste parameter';
 
   @override
-  String get connectionReady => 'Ready';
+  String get connectionReady => 'Gereed';
 
   @override
-  String get connectionWaiting => 'Waiting';
+  String get connectionWaiting => 'Wachten';
 
   @override
-  String get export => 'Export';
+  String get export => 'Exporteren';
 
   @override
-  String get exportReady => 'Ready';
+  String get exportReady => 'Gereed';
 
   @override
-  String get exportPreparing => 'Preparing';
+  String get exportPreparing => 'Voorbereiden';
 
   @override
-  String get txtExportReady => 'TXT Export Ready';
+  String get txtExportReady => 'TXT-export gereed';
 
   @override
   String get exportDescription =>
-      'Exported parameter file can be saved or shared.';
+      'Het geëxporteerde parameterbestand kan worden opgeslagen of gedeeld.';
 
   @override
-  String get saveTxt => 'Save TXT';
+  String get saveTxt => 'TXT opslaan';
 
   @override
-  String get preview => 'Preview';
+  String get preview => 'Voorbeeld';
 
   @override
-  String get downloadProgress => 'Download progress';
+  String get downloadProgress => 'Downloadvoortgang';
 
   @override
   String parameterProgressValue(int current, int total) {

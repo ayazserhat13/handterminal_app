@@ -206,7 +206,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bluetoothReconnecting => 'Reconnecting...';
 
   @override
-  String get parametersTitle => 'Parameters';
+  String get parametersTitle => 'Parameter export';
 
   @override
   String get parameterExportSubtitle => 'FB10 parameter export';

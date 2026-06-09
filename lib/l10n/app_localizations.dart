@@ -9,7 +9,6 @@ import 'app_localizations_de.dart';
 import 'app_localizations_en.dart';
 import 'app_localizations_fr.dart';
 import 'app_localizations_nl.dart';
-import 'app_localizations_tr.dart';
 
 // ignore_for_file: type=lint
 
@@ -101,7 +100,6 @@ abstract class AppLocalizations {
     Locale('en'),
     Locale('fr'),
     Locale('nl'),
-    Locale('tr'),
   ];
 
   /// No description provided for @appTitle.
@@ -485,7 +483,7 @@ abstract class AppLocalizations {
   /// No description provided for @parametersTitle.
   ///
   /// In en, this message translates to:
-  /// **'Parameters'**
+  /// **'Parameter export'**
   String get parametersTitle;
 
   /// No description provided for @parameterExportSubtitle.
@@ -596,7 +594,7 @@ class _AppLocalizationsDelegate
 
   @override
   bool isSupported(Locale locale) =>
-      <String>['de', 'en', 'fr', 'nl', 'tr'].contains(locale.languageCode);
+      <String>['de', 'en', 'fr', 'nl'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
@@ -613,8 +611,6 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
       return AppLocalizationsFr();
     case 'nl':
       return AppLocalizationsNl();
-    case 'tr':
-      return AppLocalizationsTr();
   }
 
   throw FlutterError(

@@ -208,7 +208,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get bluetoothReconnecting => 'Verbindung wird wiederhergestellt...';
 
   @override
-  String get parametersTitle => 'Parameter';
+  String get parametersTitle => 'Parameterexport';
 
   @override
   String get parameterExportSubtitle => 'FB10-Parameterexport';

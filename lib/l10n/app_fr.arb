@@ -85,5 +85,40 @@
   "bluetoothConnectionError": "Erreur de connexion",
   "bluetoothConnectionLost": "Connexion Bluetooth perdue",
   "bluetoothTurnOnRequired": "Le Bluetooth doit être activé",
-  "bluetoothReconnecting": "Reconnexion en cours..."
+  "bluetoothReconnecting": "Reconnexion en cours...",
+
+  "parametersTitle": "Export des paramètres",
+  "parameterExportSubtitle": "Export des paramètres FB10",
+  "downloadedPackets": "Paquets téléchargés",
+  "lastParameter": "Dernier paramètre",
+  "connectionReady": "Prêt",
+  "connectionWaiting": "En attente",
+  "export": "Exporter",
+  "exportReady": "Prêt",
+  "exportPreparing": "Préparation",
+  "txtExportReady": "Export TXT prêt",
+  "exportDescription": "Le fichier de paramètres exporté peut être enregistré ou partagé.",
+  "saveTxt": "Enregistrer TXT",
+  "preview": "Aperçu",
+  "downloadProgress": "Progression du téléchargement",
+  "parameterProgressValue": "{current} / {total}",
+  "@parameterProgressValue": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "percentComplete": "{percent} %",
+  "@percentComplete": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "noParameter": "—"
 }
